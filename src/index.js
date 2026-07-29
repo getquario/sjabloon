@@ -1,291 +1,32 @@
 /**
- * Tiny, CSP-safe template engine powered by xprsn expressions.
- * Templates compile to a composition of closures; template text is never
- * turned into JavaScript, so strict CSP is satisfied.
+ * The token edition, and the engine proper: a template renders to a stream of
+ * literal and value tokens. Escaping belongs to whoever consumes the stream,
+ * so nothing here is HTML-aware and `{{{ }}}` has no meaning — `{{ }}` is
+ * already raw.
  */
-import { compile, isDiagnostic as isXprsnDiagnostic } from 'xprsn';
+import { make } from './core.js';
 
-const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
-const esc = s => String(s).replace(/[&<>"']/g, c => ESC[c]);
-const BLOCKED = /^(?:__proto__|constructor|prototype)$/;
-const DIAGNOSTICS = new WeakSet();
-const mark = DIAGNOSTICS.add.bind(DIAGNOSTICS);
-const owns = DIAGNOSTICS.has.bind(DIAGNOSTICS);
+export { isDiagnostic } from './core.js';
+
+export const { template, render } = make([
+	// Static text is a compile-time constant: hoist and freeze one token per
+	// text node rather than allocating a fresh object every loop iteration.
+	s => (t => (v, o) => { o.push(t); })(Object.freeze({ literal: s })),
+	e => (v, o) => { o.push({ value: e(v) }); },
+	0,
+	() => [],
+	o => o,
+]);
 
 /**
- * Check whether an error was produced or translated by sjabloon.
+ * Join a token stream into the string `sjabloon/text` would have produced:
+ * literals verbatim, values as `String(value ?? '')`.
  *
- * @param {unknown} error Any thrown value.
- * @returns {boolean} Whether `error` is an authentic sjabloon diagnostic.
+ * @param {readonly ({ literal: string } | { value: unknown })[]} tokens A render's output.
+ * @returns {string} The joined text.
  */
-export const isDiagnostic = error => owns(error);
-
-// Linear scan into text/tag/raw tokens. Dashes hug braces (`{{- x -}}` trims;
-// `{{ -x }}` stays unary minus). Prefer {{{ }}} over {{ }}. `triple` latches
-// off once }}} is gone so {{{...}}×N does not rescan to EOF (stays O(n)).
-let lex = s => {
-	const out = [];
-	for (let i = 0, triple = 1; i < s.length; ) {
-		const a = s.indexOf('{{', i);
-		if (a < 0) { out.push([0, s.slice(i)]); break; }
-		if (a > i) out.push([0, s.slice(i, a)]);
-		let raw = s[a + 2] === '{', p = a + 2 + raw, l = s[p] === '-', b = -1;
-		if (l) p++;
-		if (raw && triple) { b = s.indexOf('}}}', p); if (b < 0) triple = 0; }
-		if (b < 0) {
-			if (raw) { raw = !1; p = a + 2; l = s[p] === '-'; if (l) p++; }
-			b = s.indexOf('}}', p);
-		}
-		if (b < 0) { out.push([0, s.slice(a)]); break; }
-		const r = b > p && s[b - 1] === '-';
-		const q = r ? b - 1 : b, whole = s.slice(p, q), body = whole.trim();
-		const start = p + whole.length - whole.trimStart().length, end = b + 2 + raw;
-		const t = [raw ? 1 : 2, body, a, end, start];
-		const prev = out.at(-1);
-		if (l && prev?.[0] === 0 && prev[1]) prev[1] = prev[1].trimEnd();
-		out.push(t);
-		i = end;
-		if (r) while (/\s/.test(s[i])) i++;
-	}
-	return out;
+export const text = tokens => {
+	let s = '';
+	for (const t of tokens) s += t.literal ?? String(t.value ?? '');
+	return s;
 };
-
-// Shared parser state; parsing is synchronous so this is safe.
-// `nms` collects free variables, `fnms` the registry functions called.
-let toks, i, fns, last, bound, nms, fnms, src, blocks;
-
-// The opt-in raw-value collector rides the render's root scope under a
-// symbol: invisible to expressions, inherited by `#each` child scopes, and
-// naturally per render, so re-entrant renders each collect into their own.
-const RAWS = Symbol();
-
-let snap = () => Object.freeze(blocks.slice());
-// Block nesting is capped so a pathological template fails as a deterministic
-// SyntaxError at the offending opener, far below the native stack limit.
-const DEPTH = 256;
-let opener = (type, t) => {
-	blocks.length < DEPTH || fault('Template too deeply nested', 'SJABLOON_TOO_DEEP', t);
-	return Object.freeze({ type, start: t[2], end: t[3] });
-};
-let attach = (e, context) => {
-	Object.defineProperty(e, 'blocks', { value: context, enumerable: true });
-	mark(e);
-	return e;
-};
-let fault = (msg, code, t, start = t?.[2] ?? src.length, end = t?.[3] ?? src.length) => {
-	const e = SyntaxError(msg);
-	e.code = code;
-	e.start = start;
-	e.end = end;
-	throw attach(e, snap());
-};
-let translated = (e, start, context, owns = isXprsnDiagnostic) => {
-	if (!owns(e)) throw e;
-	e.start += start;
-	e.end += start;
-	throw attach(e, context);
-};
-let unexpected = t => fault('Unexpected {{' + t[1] + '}}', 'SJABLOON_UNEXPECTED_TAG', t);
-
-// Render a list of nodes against a scope.
-let run = (nodes, v) => nodes.map(n => n(v)).join('');
-
-// A leaf interpolation node: compile `src`, render nullish as '', apply `wrap`
-// (`esc` for `{{ }}`, `String` for the raw `{{{ }}}` form). The pre-stringify
-// result feeds the opt-in `raws` collector; block expressions never do.
-let interp = (t, wrap) => (e => (v, x) => (x = e(v), v[RAWS]?.push(x), wrap(x ?? '')))(cp(t[1], t[4], snap()));
-
-// Compile one expression and collect its free variables (minus the loop
-// variables currently in scope, which belong to the template) and the registry
-// functions it calls.
-let cp = (s, start, context) => {
-	let e;
-	try {
-		e = compile(s, fns);
-	} catch (x) {
-		translated(x, start, context);
-	}
-	for (const n of e.names) bound.includes(n) || nms.add(n);
-	for (const fn of e.functions) fnms.add(fn);
-	return v => {
-		try {
-			return e(v);
-		} catch (x) {
-			translated(x, start, context, e.isDiagnostic);
-		}
-	};
-};
-
-// One `#if`/`#elif` link: parse its branch, then recurse on the chain tail.
-let branch = cond => {
-	const then = parse(['#elif', '#else', '/if']);
-	const tag = last[1];
-	let els = [];
-	if (tag.startsWith('#elif ')) els = [branch(cp(tag.slice(6), last[4] + 6, snap()))];
-	else if (tag === '#else') {
-		els = parse(['/if']);
-		last[1] === '/if' || unexpected(last);
-	} else if (tag !== '/if') unexpected(last);
-	return v => run(cond(v) ? then : els, v);
-};
-
-let parse = stops => {
-	const nodes = [];
-	for (let t; (t = toks[i++]); ) {
-		const tag = t[1];
-		if (!t[0]) {
-			nodes.push((s => () => s)(tag));
-		} else if (t[0] === 1) {
-			nodes.push(interp(t, String));
-		} else if (stops.includes(tag.split(' ')[0])) {
-			last = t;
-			return nodes;
-		} else if (tag[0] === '!') {
-			// comment
-		} else if (tag.startsWith('#if ')) {
-			blocks.push(opener('if', t));
-			nodes.push(branch(cp(tag.slice(4), t[4] + 4, snap())));
-			blocks.pop();
-		} else if (/^#each(?:\s|$)/.test(tag)) {
-			blocks.push(opener('each', t));
-			const m = /^#each ([\s\S]+) as ((\w+)(?:\s*,\s*(\w+))?)$/.exec(tag);
-			m || fault('Bad {{' + tag + '}}', 'SJABLOON_EACH_SYNTAX', t);
-			const name = m[3], idx = m[4], at = t[4] + tag.length - m[2].length;
-			if (BLOCKED.test(name)) fault('Bad {{' + tag + '}}', 'SJABLOON_BLOCKED_BINDING', t, at, at + name.length);
-			if (idx && BLOCKED.test(idx)) {
-				const p = t[4] + tag.length - idx.length;
-				fault('Bad {{' + tag + '}}', 'SJABLOON_BLOCKED_BINDING', t, p, p + idx.length);
-			}
-			const list = cp(m[1], t[4] + 6, snap());
-			// `name`, `idx`, and `loop` are engine-bound inside the body, so
-			// exclude them from names there and restore outer bindings after.
-			const mark = bound.length;
-			bound.push(name);
-			if (idx) bound.push(idx);
-			bound.push('loop');
-			const body = parse(['#else', '/each']);
-			bound.length = mark;
-			let empty = [];
-			if (last[1] === '#else') {
-				empty = parse(['/each']);
-				last[1] === '/each' || unexpected(last);
-			} else if (last[1] !== '/each') unexpected(last);
-			blocks.pop();
-			// Child scopes inherit the parent via the prototype chain, so outer
-			// variables stay visible inside the loop body. `@` re-points to the
-			// current item at each level, `$` (root) rides the chain, and `loop`
-			// carries the iteration metadata (index/first/last/length).
-			nodes.push(v => {
-				const lv = list(v), arr = Array.isArray(lv);
-				const ps = arr ? lv.slice() : lv && typeof lv === 'object' ? Object.keys(lv).map(k => [lv[k], k]) : [];
-				if (!ps.length) return run(empty, v);
-				return ps.map((x, j) => {
-					const item = arr ? x : x[0], key = arr ? j : x[1];
-					const s = Object.create(v);
-					s[name] = item;
-					if (idx) s[idx] = key;
-					s['@'] = item;
-					s.loop = { index: j + 1, index0: j, first: !j, last: j === ps.length - 1, length: ps.length };
-					return run(body, s);
-				}).join('');
-			});
-		} else if (/^#(?:if|elif|else)(?:\s|$)/.test(tag) || tag[0] === '/') {
-			unexpected(t);
-		} else if (tag[0] === '#') {
-			fault('Unknown {{' + tag + '}}', 'SJABLOON_UNKNOWN_BLOCK', t);
-		} else {
-			nodes.push(interp(t, esc));
-		}
-	}
-	stops.length && fault('Missing {{' + stops[stops.length - 1] + '}}', 'SJABLOON_UNCLOSED_BLOCK');
-	return nodes;
-};
-
-/**
- * Compile a template once, render it many times.
- *
- * The returned renderer exposes `names`: the variables the template reads
- * from your values, deduplicated. Loop variables the template introduces are
- * not included. It also exposes `functions`: the registry functions the
- * template calls, deduplicated.
- *
- * Two anchors are always in scope: `$` is the root values, and `@` is the
- * current `#each` item (the root outside any loop). They let a nested loop
- * reach the root (`$.company`) or the current item (`@.total`) explicitly,
- * past any shadowing. Neither counts as a `name`.
- *
- * An embedder with its own scope model can override the anchors per render by
- * passing `{ root, item }` as the renderer's second argument: `$` becomes
- * `root` and `@` becomes `item` (two distinct objects). Omit `item` to leave
- * `@` unbound, so reading `@.x` throws through xprsn's guard.
- *
- * The renderer also exposes `withRaw(values, scope)`: one render, both channels.
- * It returns `{ text, raws }` — the rendered string plus each interpolation's
- * pre-escape, pre-stringify value (`{{ }}` and `{{{ }}}` alike, nullish
- * included), in render order: loop bodies push once per iteration, untaken
- * branches push nothing. Block expressions (`#if` conditions, `#each`
- * collections) are never captured.
- *
- * @param {string} str The template, e.g. `'Hello {{ user.name }}!'`.
- * @param {Record<string, Function>} [funcs] Functions callable inside expressions.
- * @returns {{(values?: Record<string, any>, scope?: { root?: any, item?: any }): string, withRaw: (values?: Record<string, any>, scope?: { root?: any, item?: any }) => { text: string, raws: unknown[] }, names: string[], functions: string[]}} Renderer for the compiled template.
- * @throws {SyntaxError} On malformed tags, unclosed blocks, or bad expressions.
- */
-export function template(str, funcs) {
-	fns = funcs;
-	// `$` (root) and `@` (current item) are engine-bound anchors, always in
-	// scope, so they never count as caller-supplied `names`.
-	bound = ['$', '@'];
-	nms = new Set();
-	fnms = new Set();
-	src = String(str);
-	blocks = [];
-	toks = lex(src);
-	i = 0;
-	// Deeply nested blocks overflow the recursive-descent parser; surface that
-	// as a SyntaxError so malformed input keeps its documented compile-time
-	// contract (mirroring xprsn's XPRSN_TOO_DEEP for expressions).
-	let nodes;
-	try {
-		nodes = parse([]);
-	} catch (x) {
-		// An empty span at the end, like an unclosed block.
-		if (x instanceof RangeError) fault('Template too deeply nested', 'SJABLOON_TOO_DEEP');
-		throw x;
-	}
-	// Wrap the values in a root scope carrying the anchors, without mutating
-	// what the caller passed: by default `$` and `@` both point at the root.
-	// An embedder can override the anchors with a `{ root, item }` second arg:
-	// `$` = root, `@` = item (distinct objects). Omitting `item` leaves `@`
-	// unbound, so `@.x` throws through xprsn's guard — a group-header band that
-	// has no current row wants exactly that.
-	const g = (v, o, w) => {
-		v = v || {};
-		const r = Object.create(v);
-		r['$'] = o ? o.root : v;
-		if (!o) r['@'] = v;
-		else if ('item' in o) r['@'] = o.item;
-		r[RAWS] = w;
-		return run(nodes, r);
-	};
-	const f = (v, o) => g(v, o);
-	// One render, both channels: the rendered string plus the ordered raws.
-	f.withRaw = (v, o, w = []) => ({ text: g(v, o, w), raws: w });
-	// Array.from, not a spread: the bundler's transpile turns `[...set]` into
-	// `[].concat(set)`, which wraps the Set instead of unpacking it.
-	f.names = Array.from(nms);
-	f.functions = Array.from(fnms);
-	return f;
-}
-
-/**
- * Compile and render a template in one go.
- *
- * @param {string} str The template to render.
- * @param {Record<string, any>} [values] Variables available to the template.
- * @param {Record<string, Function>} [funcs] Functions callable inside expressions.
- * @returns {string} The rendered output.
- */
-export function render(str, values, funcs) {
-	return template(str, funcs)(values);
-}

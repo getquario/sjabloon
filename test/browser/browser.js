@@ -1,4 +1,5 @@
-import { render, template } from '/dist/index.js';
+import { isDiagnostic, template as tokenTemplate, text } from '/dist/index.js';
+import { isDiagnostic as htmlIsDiagnostic, render, template } from '/dist/html.js';
 
 const result = document.querySelector('#result');
 const rendered = document.querySelector('#rendered');
@@ -50,6 +51,16 @@ try {
 			return 'allowed';
 		},
 	}) === 'allowed' && helperCalled, 'registered helper was not callable');
+
+	// The token entry, against the real built bundle under CSP.
+	const cell = tokenTemplate('{{ product }}')({ product: 'Koffie & Thee' });
+	assert(cell.length === 1 && cell[0].value === 'Koffie & Thee', 'token entry did not emit one bare value');
+	assert(text(cell) === 'Koffie & Thee', 'text() did not join the stream unescaped');
+
+	// Two entry bundles, one core chunk. If the core were ever inlined per
+	// entry they would hold separate WeakSets, and diagnostics would stop
+	// authenticating across entries.
+	assert(isDiagnostic === htmlIsDiagnostic, 'entries do not share one core instance');
 
 	await new Promise(resolve => setTimeout(resolve, 0));
 	assert(violations.length === 0, `CSP violation: ${violations.join(', ')}`);

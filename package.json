@@ -11,32 +11,63 @@
 	},
 	"type": "module",
 	"source": "src/index.js",
-	"main": "dist/index.cjs",
 	"module": "dist/index.js",
 	"types": "index.d.ts",
 	"exports": {
 		".": {
 			"types": "./index.d.ts",
-			"import": "./dist/index.js",
-			"require": "./dist/index.cjs"
-		}
+			"default": "./dist/index.js"
+		},
+		"./text": {
+			"types": "./text.d.ts",
+			"default": "./dist/text.js"
+		},
+		"./html": {
+			"types": "./html.d.ts",
+			"default": "./dist/html.js"
+		},
+		"./package.json": "./package.json"
 	},
 	"engines": {
-		"node": ">=22.0.0"
+		"node": ">=22.12.0"
 	},
 	"files": [
 		"dist",
 		"src",
-		"index.d.ts"
+		"index.d.ts",
+		"text.d.ts",
+		"html.d.ts",
+		"types.d.ts"
 	],
 	"size-limit": [
 		{
-			"path": "dist/index.js",
-			"limit": "1.76 kB"
+			"name": "sjabloon",
+			"path": [
+				"dist/index.js",
+				"dist/core.js"
+			],
+			"limit": "1.95 kB"
 		},
 		{
-			"path": "dist/index.cjs",
-			"limit": "1.78 kB"
+			"name": "sjabloon/text",
+			"path": [
+				"dist/text.js",
+				"dist/core.js"
+			],
+			"limit": "1.9 kB"
+		},
+		{
+			"name": "sjabloon/html",
+			"path": [
+				"dist/html.js",
+				"dist/core.js"
+			],
+			"limit": "1.97 kB"
+		},
+		{
+			"name": "core chunk (informational)",
+			"path": "dist/core.js",
+			"limit": "1.75 kB"
 		}
 	],
 	"scripts": {

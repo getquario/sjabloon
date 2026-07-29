@@ -1,18 +1,33 @@
 import {
 	isDiagnostic,
 	template,
+	text,
 	type SjabloonBlock,
 	type SjabloonDiagnostic,
 	type SjabloonErrorCode,
+	type Token,
 } from 'sjabloon';
+import { template as htmlTemplate } from 'sjabloon/html';
+import { template as textTemplate } from 'sjabloon/text';
 
 const render = template('{{ user.name }}');
-const output: string = render({ user: { name: 'Robin' } });
+const tokens: Token[] = render({ user: { name: 'Robin' } });
+const joined: string = text(tokens);
 const names: string[] = render.names;
+const functions: string[] = render.functions;
 
-const collected: { text: string; raws: unknown[] } = render.withRaw({ user: { name: 'Robin' } });
-const anchored: { text: string; raws: unknown[] } = render.withRaw({}, { root: { user: { name: 'R' } }, item: {} });
-void [collected, anchored];
+const markup: string = htmlTemplate('{{ x }}')({ x: 1 });
+const bare: string = textTemplate('{{ x }}')({ x: 1 });
+const anchored: Token[] = render({}, { root: { user: { name: 'R' } }, item: {} });
+
+// @ts-expect-error the root entry renders tokens, not a string
+const wrongRoot: string = template('{{ x }}')({});
+
+// @ts-expect-error the html entry renders a string, not tokens
+const wrongHtml: Token[] = htmlTemplate('{{ x }}')({});
+
+// One shared union across every entry, including the new raw-tag code.
+const codes: SjabloonErrorCode[] = ['SJABLOON_RAW_TAG', 'SJABLOON_TOO_DEEP'];
 
 try {
 	render();
@@ -34,4 +49,4 @@ try {
 	}
 }
 
-void [output, names];
+void [joined, names, functions, markup, bare, anchored, wrongRoot, wrongHtml, codes];

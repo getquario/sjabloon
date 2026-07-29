@@ -1,6 +1,8 @@
 // Manual micro- and scaling benchmarks for sjabloon. Run with `npm run bench`.
 import assert from 'node:assert/strict';
-import { render, template } from '../src/index.js';
+import { render, template } from '../src/html.js';
+import { template as tokenTemplate, text } from '../src/index.js';
+import { template as textTemplate } from '../src/text.js';
 
 let sink = 0;
 
@@ -52,6 +54,26 @@ console.log('\nMicrobenchmarks (best of 5)');
 micro('compile: template', () => template(TPL));
 micro('run: 10 items', () => renderOrder(small));
 micro('render: one-shot (10)', () => render(TPL, small));
+
+// What the token edition actually costs against the string editions, on the
+// same template. The single-cell case is the downstream report shape and the
+// one most exposed to per-token allocation.
+const cell = { product: 'Koffie' };
+const htmlCell = template('{{ product }}');
+const textCell = textTemplate('{{ product }}');
+const tokenCell = tokenTemplate('{{ product }}');
+const tokenOrder = tokenTemplate(TPL);
+
+console.log('\nEditions: one interpolation (best of 5)');
+micro('html: cell', () => htmlCell(cell));
+micro('text: cell', () => textCell(cell));
+micro('token: cell', () => tokenCell(cell));
+micro('token: cell + text()', () => text(tokenCell(cell)));
+
+console.log('\nEditions: 10-item order (best of 5)');
+micro('html: order', () => renderOrder(small));
+micro('token: order', () => tokenOrder(small));
+micro('token: order + text()', () => text(tokenOrder(small)));
 
 console.log('\nScaling, precompiled (best of 3)');
 for (const size of [10, 100, 1_000]) {

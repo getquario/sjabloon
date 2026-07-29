@@ -1,6 +1,15 @@
 import assert from 'node:assert';
 import { FuzzedDataProvider } from '@jazzer.js/core';
-import { isDiagnostic, template } from '../src/index.js';
+import { isDiagnostic, template } from '../src/html.js';
+import { template as rootTemplate, text as joinTokens } from '../src/index.js';
+import { template as textTemplate } from '../src/text.js';
+
+// The two editions without a raw form, picked from bytes read after every
+// other consume so the committed corpus keeps its meaning.
+const RAWLESS = [
+	{ name: 'sjabloon', template: rootTemplate, out: joinTokens },
+	{ name: 'sjabloon/text', template: textTemplate, out: s => s },
+];
 
 const OPS = ['+','-','*','/','%','==','!=','<','>','<=','>=','and','or','&&','||','??','in'];
 const UNARY = ['!','-','not '];
@@ -193,6 +202,16 @@ function assertEscaped(out) {
 	const v = { s: `&<>"'` };
 	assert.strictEqual(template('{{ s }}')(v), '&amp;&lt;&gt;&quot;&#39;');
 	assert.strictEqual(template('{{{ s }}}')(v), `&<>"'`);
+
+	// The other editions are output-neutral: they pass the same characters
+	// through untouched, and reject the raw form outright.
+	for (const entry of RAWLESS) {
+		assert.strictEqual(entry.out(entry.template('{{ s }}')(v)), `&<>"'`, entry.name + ' escaped');
+		let code;
+		try { entry.template('{{{ s }}}'); } catch (e) { code = e.code; }
+		assert.strictEqual(code, 'SJABLOON_RAW_TAG', entry.name + ' accepted a raw tag');
+	}
+	assert.deepStrictEqual(rootTemplate('a{{ s }}')(v), [{ literal: 'a' }, { value: `&<>"'` }]);
 })();
 
 // Blocked-key reads must throw TypeError through xprsn's guard, across the same
@@ -230,7 +249,42 @@ export function fuzz(data) {
 	// When raw interpolation is disallowed, the strict escaping scan applies.
 	const raw = provider.consumeBoolean();
 	const src = buildTemplate(provider, depth, raw);
+	const values = htmlPass(provider, src, raw);
+	// Read LAST, after every consume the html pass makes: an exhausted provider
+	// returns the range minimum, so each committed corpus entry still picks
+	// index 0 and replays byte for byte. Only new discovery, which appends
+	// bytes, reaches the second edition.
+	rawlessPass(RAWLESS[provider.consumeIntegralInRange(0, RAWLESS.length - 1)], src, values);
+}
 
+// The raw-less editions honour the same diagnostic contract as html — same
+// parser, same spans, same provenance — and differ only in escaping and in
+// rejecting {{{ }}} with a located SJABLOON_RAW_TAG.
+function rawlessPass(entry, src, values) {
+	let render;
+	try { render = entry.template(src, FUNCS); }
+	catch (e) {
+		if (!isCompileErr(e)) throw e;
+		// isDiagnostic comes from the html entry: one shared core means it must
+		// authenticate errors thrown through the others too.
+		if (isDiagnostic(e)) diagnostic(e, src);
+		else if (Object.hasOwn(e, 'blocks')) throw new Error('unauthenticated error gained template context');
+		return;
+	}
+	if (values === undefined) return;
+	let out;
+	try { out = entry.out(render(values)); }
+	catch (e) { if (!isRenderErr(e)) throw e; return; }
+	finally {
+		if (!protoIntact()) throw new Error('Object.prototype polluted');
+	}
+	if (typeof out !== 'string') throw new Error(entry.name + ': text projection is not a string');
+	assert.strictEqual(entry.out(render(values)), out, 'non-deterministic render');
+}
+
+// The html edition, unchanged from 0.6: {{ }} escapes, {{{ }}} is raw. Every
+// committed corpus entry drives this path.
+function htmlPass(provider, src, raw) {
 	let render;
 	try { render = template(src, FUNCS); }
 	catch (e) {
@@ -290,4 +344,5 @@ export function fuzz(data) {
 		}
 		throw new Error('render diagnostic disappeared');
 	}
+	return values;
 }

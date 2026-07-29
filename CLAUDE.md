@@ -7,8 +7,8 @@ Tiny, CSP-safe template engine powered by xprsn expressions. Zero-config sibling
 - `npm run check` — the complete pull-request CI quality gate: build, size budgets, unit/types, deterministic fuzz regression, and browser CSP coverage.
 - **Non-negotiable: run `npm run check` before declaring any work done.** Passing unit tests alone is not done — a change is complete only when the full gate above is green. Never say "done", close an issue, or hand off without it.
 - `npm test` — Node's built-in test runner under `--disallow-code-generation-from-strings` (strict-CSP simulation), then `npm run test:types` (a smoke check that `index.d.ts` is usable, in `test/types.check.ts`). Keep this on Node: Bun accepts that V8 flag but does not enforce it.
-- `npm run build` — tsdown (rolldown + oxc), configured in `tsdown.config.js` → `dist/` (ESM/CJS targeting ES2024). Type generation is off; `index.d.ts` is hand-written. `xprsn` stays external (a runtime dependency, not bundled).
-- `npm run size` — size-limit checks the gzip size of `dist/index.js` and `dist/index.cjs` against the budgets in `package.json`.
+- `npm run build` — tsdown (rolldown + oxc), configured in `tsdown.config.js` → `dist/` (ESM only, ES2024). Three entries plus one shared `dist/core.js` chunk. Type generation is off; the `.d.ts` files are hand-written. `xprsn` stays external (a runtime dependency, not bundled). `hash: false` is the only non-default knob, so the chunk name stays `core.js` and the size budgets and browser harness can name it.
+- `npm run size` — size-limit checks each entry **plus the shared core chunk** against the budgets in `package.json`. Note it measures **brotli**, not gzip, and tsdown's build log reports gzip — the two numbers differ by ~150 B, so don't compare them.
 - `npm run test:browser` — builds the package and runs the browser bundle in Playwright Chromium under a strict CSP.
 - Run a single suite: `node --disallow-code-generation-from-strings --test test/render.test.js`
 - `npm run bench` — zero-dependency micro-benchmarks in `bench/`, run against `src/`. Measures template compile and render throughput separately (compile-once, render-many). `bench/` is not in `files`, so it is never published.
@@ -16,18 +16,27 @@ Tiny, CSP-safe template engine powered by xprsn expressions. Zero-config sibling
 
 ## Architecture
 
-The entire implementation is `src/index.js` (~130 lines, one file by design). One regex splits the template into strides of 7 (`text, rawL, raw, rawR, tagL, tag, tagR` — the L/R groups are the `{{-`/`-}}` trim dashes, which must hug the braces so `{{ -price }}` stays a unary minus). A recursive parser turns blocks into closures (`#if`/`#elif` chains recurse via `branch()`), and every expression goes through `cp()`, which wraps xprsn's `compile` and collects free variables. `template(str)` returns a plain `(values) => string` carrying `.names`. No AST, no code generation — same closure-compiler approach as xprsn, one level up.
+`src/core.js` is the whole engine — lexer, parser, diagnostics — and three thin entries choose what it emits: `src/index.js` (tokens, plus `text()`), `src/text.js` (unescaped string), `src/html.js` (escaped string, and the only file that knows what HTML is).
 
-Parser state (`toks`, `i`, `fns`, `last`) is module-level and shared; parsing is synchronous so this is safe.
+`lex()` is a hand-rolled linear `indexOf` scanner, not a regex. Dashes must hug the braces so `{{ -price }}` stays a unary minus, and the `triple` latch turns off once `}}}` is gone so `{{{…}}×N` never rescans to EOF — that latch is what keeps lexing O(n) and there is a ReDoS test pinning it. Tokens are `[kind, body, tagStart, tagEnd, bodyStart]`, kind `0`/`1`/`2` = text/raw/escaped.
+
+A recursive parser turns blocks into closures (`#if`/`#elif` chains recurse via `branch()`), and every expression goes through `cp()`, which wraps xprsn's `compile` and collects free variables. No AST, no code generation — same closure-compiler approach as xprsn, one level up.
+
+**Nodes are `(scope, acc) => void`.** They append into one accumulator that the root wrapper creates per render and threads all the way down — no intermediate array per node list, no join, and render order is just append order. `run()` is profile-blind; only the three node builders differ per edition.
+
+**`make(profile)`** binds the parser to an output profile: `[lit, val, raw, seed, take]`, a positional tuple because oxc does not mangle property names. `raw` is `0` in editions that reject `{{{ }}}`. The profile is read **only while parsing** and baked into node closures, so the render hot path has zero profile indirection. Parser state (`toks`, `i`, `fns`, `last`, `LIT`/`VAL`/`RAW`, …) stays module-level in `core.js` and is not moved inside `make` — that is deliberate, since it keeps the diagnostics WeakSet a single shared instance by file layout rather than by vigilance.
+
+**The shared chunk is load-bearing.** `DIAGNOSTICS` is the only thing making diagnostics unforgeable, so if `core.js` were ever inlined per entry each would get its own WeakSet and `isDiagnostic` would return `false` across entries. Rolldown shares it by default; the guarantee is pinned by test, not config — `test/browser/browser.js` asserts `isDiagnostic === htmlIsDiagnostic` against the real bundles. After any build change, check `grep -c 'new WeakSet' dist/*.js` is 1 in `core.js` and 0 in every entry.
 
 `#each` scopes are `Object.create(parent)` with the loop variable set as an own key: xprsn's variable lookup walks the prototype chain, so outer variables stay visible for free, and parent values are never mutated.
 
 ## Hard constraints
 
 1. **CSP safety is non-negotiable.** Same rules as xprsn: no string-to-code paths, the suite runs under `--disallow-code-generation-from-strings`, and a test scans the source — don't use the words "eval" or "new Function" even in comments.
-2. **Escaping is the default.** `{{ expr }}` must HTML-escape (`& < > " '`); raw output only via explicit `{{{ }}}`. Never flip that default.
+2. **Escaping lives in `src/html.js` and nowhere else.** That edition must HTML-escape `{{ }}` (`& < > " '`) with raw output only via explicit `{{{ }}}` — never flip that default *there*. The other two editions are output-neutral by design and escape nothing; do not "helpfully" add escaping to them, and do not let `esc` drift back into `core.js`.
 3. **All expression evaluation goes through xprsn's public API** (`compile` from the `xprsn` package). Never reimplement or inline expression parsing here — the `get()` security guard lives in xprsn and must stay single-sourced.
-4. Size is a soft goal (~1.1KB min+gzip on top of xprsn). Lukeed-style terse code, but never trade escaping, a guard, or a passing test for bytes.
+4. **Never weaken `isDiagnostic`.** It is a WeakSet precisely so a forged `code`/`start`/`end`/`blocks` cannot authenticate; there is a test for that. A `Symbol.for` brand or any other guessable marker is not an acceptable trade for cross-instance convenience.
+5. Size is a soft goal (~1.9KB min+brotli per entry, core chunk included). Lukeed-style terse code, but never trade escaping, a guard, or a passing test for bytes — the 0.7 accumulator rewrite cost ~16 B and bought 1.4× render throughput, which is the right direction.
 
 ## Omakase pragmatism
 
@@ -35,12 +44,13 @@ Apply this across the whole project: implementation, API design, tests, document
 
 ## Semantics to preserve
 
-- `null`/`undefined` interpolate as empty strings (template-friendly, unlike raw xprsn).
-- Compile-time `SyntaxError` for malformed/unclosed tags and bad expressions; runtime `TypeError` comes from xprsn's guards.
+- `null`/`undefined` interpolate as empty strings in the string editions (template-friendly, unlike raw xprsn); the token edition carries them through as-is and `text()` applies the same `?? ''`.
+- Compile-time `SyntaxError` for malformed/unclosed tags and bad expressions; runtime `TypeError` comes from xprsn's guards. `{{{ }}}` outside `sjabloon/html` is `SJABLOON_RAW_TAG`, rejected in the **parser**, not the lexer — the lexer must keep tokenizing `}}}` in every edition or the `triple` latch (and its linearity guarantee) is lost.
 - Loop variables shadow outer names; nested `#each` shadows correctly.
 - `#each` walks `[value, key]` pairs: array indexes or own object keys; the second `as` binding is index-or-key. Nullish/non-iterable collections iterate zero times, and an empty collection renders the `{{#else}}` branch (in parent scope) if present.
 - Two scope anchors are always bound (in the root wrapper, so the caller's values object is never mutated): `$` = root values, `@` = current `#each` item (root outside any loop). Each `#each` re-points `@` on its child scope. Both are pre-seeded into `bound`, so they never appear in `names`. The renderer takes an optional `{ root, item }` second arg that overrides the anchors for embedders: `$` = `root`, `@` = `item` (distinct objects); the `'item' in o` check means omitting `item` leaves `@` unbound (so `@.x` throws), while default (no second arg) keeps `$` = `@` = values. Only reads `root`/`item` — no mutation.
-- The renderer's `withRaw(values?, scope?)` method renders once and returns `{ text, raws }`: the rendered string plus each interpolation's pre-escape, pre-stringify value (`{{ }}` and `{{{ }}}` alike, nullish as-is), in render order — loop bodies once per iteration, untaken branches never, `#each` else-branch when it renders. Block expressions (`#if` conditions, `#each` collections) are never captured. The collector rides the render's root scope under a module-private `Symbol` (invisible to expressions, inherited by `#each` child scopes via the prototype chain), so each `withRaw()` call — including re-entrant renders from registry functions — fills its own fresh array with no shared state. The one-shot `render()` stays a plain-string shorthand; `withRaw` lives on `template()`'s renderer.
+- **Token stream (root entry).** `Token` is `{ literal: string } | { value: unknown }`. One literal token per static text run, never merged, never empty (a run trimmed to nothing is dropped at compile time); values are pre-stringify with nullish as-is. Order is append order — loop bodies once per iteration, untaken branches never, `#each` else-branch when it renders — and block expressions (`#if` conditions, `#each` collections) never appear. Literal tokens are hoisted and frozen at compile time, so they are reference-identical across iterations; value tokens are fresh per emit. Re-entrancy is free: the accumulator is a local of the render call, not a side channel, so a registry function rendering another template cannot touch it.
+- **`text(tokens)` equivalence.** `text(root(v))` must equal `textEntry(v)` for every template and values, which is asserted both as a unit property and as the render fuzzer's differential oracle. Because the token edition defers stringification, it renders values the string editions cannot convert to a primitive — the failure resurfaces at `text()`, so the invariant is about the *join*, not the raw render.
 - Inside `#each`, `loop` = `{ index (1-based), index0, first, last, length }` on the child scope. `loop` is bound-scoped like the loop variables (added to `bound` for the body, restored after), so it counts as a name only when used outside a loop. Nested loops each set their own `loop`/`@`.
 - `#if`/`#elif`/`#else` chains; `#elif` requires a space and an expression.
 - Whitespace trimming is per side and only when the dash hugs the brace; it eats all adjacent whitespace including newlines.
@@ -48,8 +58,9 @@ Apply this across the whole project: implementation, API design, tests, document
 
 ## Conventions
 
-- Tabs for indentation. Tests use `node:test`, live in `test/*.test.js`, and run directly against `src/` (no build needed). Use the matching `render`, `errors`, or `safety` suite.
+- Tabs for indentation. Tests use `node:test`, live in `test/*.test.js`, and run directly against `src/` (no build needed). The suites map to the architecture: **`editions`** for anything the three editions share — one expectation table looped over an `ENTRIES` matrix, so every shared assertion runs three times — then **`tokens`**, **`html`** for what is genuinely edition-specific, plus `errors` for diagnostics and `safety` for CSP and guards. **New shared behaviour belongs in `editions`, not in an edition's own file.** If an assertion would read the same against all three, it is not edition-specific, however html-flavoured the template looks.
 - Do not mention Symfony in code, comments, or docs.
-- Runtime support is Node.js 22+ through ESM/CJS and ES2024 browser environments through a standards-based ESM bundler. There is no direct-script global or UMD build.
+- Runtime support is Node.js 22.12+ (unflagged `require(esm)`), **ESM only**, plus ES2024 browser environments through a standards-based ESM bundler. There is no CommonJS, direct-script global, or UMD build — shipping two formats would split the diagnostics WeakSet across a `require`/`import` seam, which no config can fix.
 - Suggested commit messages must follow Conventional Commits and be at most 80 characters.
-- `dist/` is gitignored build output. `index.d.ts` is **hand-written** (bundler type generation is off via `dts: false` in `tsdown.config.js`) — keep it in sync with the JSDoc in `src/index.js` by hand. `test/types.check.ts` (run by `npm run test:types`, part of `npm test`) is a smoke check that the declarations are usable.
+- `dist/` is gitignored build output. The `.d.ts` files are **hand-written** (`dts: false`): shared types live once in `types.d.ts`, and `index.d.ts`/`text.d.ts`/`html.d.ts` re-export it and declare only their own `template`/`render` return types. Hang prose on the shared types, not on each `template`, or it multiplies by three. `test/types.check.ts` (run by `npm run test:types`) covers all three entries via package self-reference and pins the return types with `@ts-expect-error`.
+- Tests that scan sources use `globSync('src/**/*.js')`, never a hardcoded filename — a scan pinned to one path keeps passing after a module moves, covering nothing. Both call sites already fail loudly on an empty match, so the glob needs no extra guard. One of them checks every `SJABLOON_*` code thrown in `src/` is declared in `types.d.ts`: worth its five lines, since `SJABLOON_TOO_DEEP` shipped undeclared for two releases and `SJABLOON_RAW_TAG` was caught by it on the way in.

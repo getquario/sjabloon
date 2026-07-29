@@ -1,7 +1,8 @@
+import { globSync, readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compile } from 'xprsn';
-import { isDiagnostic, template } from '../src/index.js';
+import { isDiagnostic, template } from '../src/html.js';
 
 let caught = fn => {
 	try {
@@ -228,4 +229,17 @@ test('runaway elif chains stay a typed SyntaxError through the overflow backstop
 	assert.ok(e instanceof SyntaxError, 'a SyntaxError, not a RangeError');
 	assert.ok(/_TOO_DEEP$/.test(e.code), 'a typed too-deep code');
 	assert.ok(isDiagnostic(e), 'authenticated as a sjabloon diagnostic');
+});
+
+// tsc cannot catch this: types.d.ts is hand-written, tsconfig only includes
+// test/, and nothing reads src/ — so the declarations are checked for being
+// usable, never for matching what the parser actually throws. That gap is how
+// SJABLOON_TOO_DEEP shipped undeclared for two releases with CI green.
+test('every SJABLOON_* code the parser throws is declared', () => {
+	const codes = new Set();
+	for (const file of globSync('src/**/*.js'))
+		for (const [, code] of readFileSync(file, 'utf8').matchAll(/'(SJABLOON_[A-Z_]+)'/g)) codes.add(code);
+	assert.ok(codes.has('SJABLOON_UNCLOSED_BLOCK'), 'the scan found the codes');
+	const declared = readFileSync(new URL('../types.d.ts', import.meta.url), 'utf8');
+	for (const code of codes) assert.match(declared, new RegExp(`'${code}'`), code);
 });

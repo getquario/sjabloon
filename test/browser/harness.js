@@ -30,7 +30,11 @@ const html = `<!doctype html>
 const files = new Map([
 	['/', ['text/html; charset=utf-8', html]],
 	['/browser.js', ['text/javascript; charset=utf-8', await readFile(new URL('./browser.js', import.meta.url))]],
+	// The entries plus the shared core chunk they both import. `hash: false`
+	// keeps that filename stable, so it can be named here rather than globbed.
 	['/dist/index.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../dist/index.js', import.meta.url))]],
+	['/dist/html.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../dist/html.js', import.meta.url))]],
+	['/dist/core.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../dist/core.js', import.meta.url))]],
 	['/xprsn/index.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../node_modules/xprsn/dist/index.js', import.meta.url))]],
 ]);
 

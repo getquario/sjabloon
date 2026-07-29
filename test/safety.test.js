@@ -1,13 +1,9 @@
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { render, template } from '../src/index.js';
+import { render, template } from '../src/html.js';
 
 const notOk = (value, message) => assert.ok(!value, message);
-
-test('escaping is the default', () => {
-	assert.strictEqual(render('{{ x }}', { x: '<script>alert(1)</script>' }), '&lt;script&gt;alert(1)&lt;/script&gt;');
-});
 
 test('xprsn prototype guards apply inside templates', () => {
 	assert.throws(() => render('{{ a.constructor }}', { a: {} }), TypeError);
@@ -27,9 +23,15 @@ test('each rejects unsafe binding names', () => {
 	}
 });
 
+// Glob src/ rather than naming one file: a scan pinned to a single path keeps
+// passing after a module moves, silently covering nothing. The length check is
+// the other half — a glob that matches nothing must fail, not pass quietly.
 test('source contains no string-to-code constructs', () => {
-	const src = readFileSync(new URL('../src/index.js', import.meta.url), 'utf8');
-	notOk(/\beval\b|\bFunction\s*\(|new\s+Function/.test(src));
+	const files = globSync('src/**/*.js');
+	assert.ok(files.length, 'the glob found the sources');
+	for (const file of files) {
+		notOk(/\beval\b|\bFunction\s*\(|new\s+Function/.test(readFileSync(file, 'utf8')), file);
+	}
 });
 
 test('tokenizer resists ReDoS-shaped input', () => {
