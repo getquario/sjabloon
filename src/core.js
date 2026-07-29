@@ -10,7 +10,16 @@
  */
 import { compile, isDiagnostic as isXprsnDiagnostic } from 'xprsn';
 
+/**
+ * @import { SjabloonDiagnostic, SjabloonErrorCode, SjabloonFunctions, SjabloonRenderer, SjabloonValues } from './types.js'
+ * @template A
+ * @typedef {(scope: any, acc: A, scratch?: any) => void} Node One compiled node: appends into
+ *   `acc` and returns nothing. The third slot is a scratch local some editions declare as a
+ *   parameter to save a `let`; callers pass two arguments.
+ */
+
 const BLOCKED = /^(?:__proto__|constructor|prototype)$/;
+/** @type {WeakSet<any>} */
 const DIAGNOSTICS = new WeakSet();
 const mark = DIAGNOSTICS.add.bind(DIAGNOSTICS);
 const owns = DIAGNOSTICS.has.bind(DIAGNOSTICS);
@@ -18,8 +27,11 @@ const owns = DIAGNOSTICS.has.bind(DIAGNOSTICS);
 /**
  * Check whether an error was produced or translated by sjabloon.
  *
+ * Every entry shares one core, so a diagnostic thrown through any of them
+ * authenticates through all of them.
+ *
  * @param {unknown} error Any thrown value.
- * @returns {boolean} Whether `error` is an authentic sjabloon diagnostic.
+ * @returns {error is SjabloonDiagnostic} Whether `error` is an authentic sjabloon diagnostic.
  */
 export const isDiagnostic = error => owns(error);
 
@@ -32,11 +44,11 @@ let lex = s => {
 		const a = s.indexOf('{{', i);
 		if (a < 0) { out.push([0, s.slice(i)]); break; }
 		if (a > i) out.push([0, s.slice(i, a)]);
-		let raw = s[a + 2] === '{', p = a + 2 + raw, l = s[p] === '-', b = -1;
+		let raw = +(s[a + 2] === '{'), p = a + 2 + raw, l = s[p] === '-', b = -1;
 		if (l) p++;
 		if (raw && triple) { b = s.indexOf('}}}', p); if (b < 0) triple = 0; }
 		if (b < 0) {
-			if (raw) { raw = !1; p = a + 2; l = s[p] === '-'; if (l) p++; }
+			if (raw) { raw = 0; p = a + 2; l = s[p] === '-'; if (l) p++; }
 			b = s.indexOf('}}', p);
 		}
 		if (b < 0) { out.push([0, s.slice(a)]); break; }
@@ -72,13 +84,25 @@ let attach = (e, context) => {
 	mark(e);
 	return e;
 };
-let fault = (msg, code, t, start = t?.[2] ?? src.length, end = t?.[3] ?? src.length) => {
-	const e = SyntaxError(msg);
+/**
+ * Throw a located compile-time diagnostic. `code` is typed to the published
+ * union, so a code that is not declared in `types.d.ts` fails to compile here
+ * rather than shipping undeclared — which is exactly how SJABLOON_TOO_DEEP got
+ * out for two releases.
+ *
+ * @param {string} msg
+ * @param {SjabloonErrorCode} code
+ * @param {any[]} [t] The token to point at; omitted for end-of-source faults.
+ * @returns {never}
+ */
+const fault = (msg, code, t, start = t?.[2] ?? src.length, end = t?.[3] ?? src.length) => {
+	const e = /** @type {SyntaxError & { code: SjabloonErrorCode, start: number, end: number }} */ (SyntaxError(msg));
 	e.code = code;
 	e.start = start;
 	e.end = end;
 	throw attach(e, snap());
 };
+/** @param {(e: unknown) => boolean} owns Predicate erased: `e` is retyped, not narrowed. */
 let translated = (e, start, context, owns = isXprsnDiagnostic) => {
 	if (!owns(e)) throw e;
 	e.start += start;
@@ -155,8 +179,9 @@ let parse = stops => {
 			blocks.pop();
 		} else if (/^#each(?:\s|$)/.test(tag)) {
 			blocks.push(opener('each', t));
-			const m = /^#each ([\s\S]+) as ((\w+)(?:\s*,\s*(\w+))?)$/.exec(tag);
-			m || fault('Bad {{' + tag + '}}', 'SJABLOON_EACH_SYNTAX', t);
+			// `|| fault()` in the initializer, not as a follow-up statement: fault
+			// returns never, so `m` is non-null from here without a second check.
+			const m = /^#each ([\s\S]+) as ((\w+)(?:\s*,\s*(\w+))?)$/.exec(tag) || fault('Bad {{' + tag + '}}', 'SJABLOON_EACH_SYNTAX', t);
 			const name = m[3], idx = m[4], at = t[4] + tag.length - m[2].length;
 			if (BLOCKED.test(name)) fault('Bad {{' + tag + '}}', 'SJABLOON_BLOCKED_BINDING', t, at, at + name.length);
 			if (idx && BLOCKED.test(idx)) {
@@ -246,8 +271,19 @@ let parse = stops => {
  *   take(acc)  the render's return value
  * Nodes are `(scope, acc) => void`; see run().
  *
- * @param {Function[]} profile The output profile, as above.
- * @returns {{ template: Function, render: Function }} That edition's API.
+ * @template A The accumulator this edition threads through its nodes.
+ * @template T What one render returns.
+ * @param {[
+ *   lit: (text: string) => Node<A>,
+ *   val: (expr: (scope: any) => any) => Node<A>,
+ *   raw: ((expr: (scope: any) => any) => Node<A>) | 0,
+ *   seed: () => A,
+ *   take: (acc: A) => T,
+ * ]} profile The output profile, as above.
+ * @returns {{
+ *   template: (str: string, funcs?: SjabloonFunctions) => SjabloonRenderer<T>,
+ *   render: (str: string, values?: SjabloonValues, funcs?: SjabloonFunctions) => T,
+ * }} That edition's API.
  * @throws {SyntaxError} `template` throws on malformed tags, unclosed blocks,
  *   or bad expressions.
  */

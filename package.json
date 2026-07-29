@@ -10,20 +10,19 @@
 		"url": "https://robinvdvleuten.nl"
 	},
 	"type": "module",
-	"source": "src/index.js",
 	"module": "dist/index.js",
-	"types": "index.d.ts",
+	"types": "dist/index.d.ts",
 	"exports": {
 		".": {
-			"types": "./index.d.ts",
+			"types": "./dist/index.d.ts",
 			"default": "./dist/index.js"
 		},
 		"./text": {
-			"types": "./text.d.ts",
+			"types": "./dist/text.d.ts",
 			"default": "./dist/text.js"
 		},
 		"./html": {
-			"types": "./html.d.ts",
+			"types": "./dist/html.d.ts",
 			"default": "./dist/html.js"
 		},
 		"./package.json": "./package.json"
@@ -32,12 +31,7 @@
 		"node": ">=22.12.0"
 	},
 	"files": [
-		"dist",
-		"src",
-		"index.d.ts",
-		"text.d.ts",
-		"html.d.ts",
-		"types.d.ts"
+		"dist"
 	],
 	"size-limit": [
 		{

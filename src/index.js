@@ -14,7 +14,7 @@ export const { template, render } = make([
 	s => (t => (v, o) => { o.push(t); })(Object.freeze({ literal: s })),
 	e => (v, o) => { o.push({ value: e(v) }); },
 	0,
-	() => [],
+	() => /** @type {import('./types.js').Token[]} */ ([]),
 	o => o,
 ]);
 
@@ -22,11 +22,14 @@ export const { template, render } = make([
  * Join a token stream into the string `sjabloon/text` would have produced:
  * literals verbatim, values as `String(value ?? '')`.
  *
- * @param {readonly ({ literal: string } | { value: unknown })[]} tokens A render's output.
+ * @param {readonly import('./types.js').Token[]} tokens A render's output.
  * @returns {string} The joined text.
  */
 export const text = tokens => {
 	let s = '';
-	for (const t of tokens) s += t.literal ?? String(t.value ?? '');
+	// One `?? ''` per token, so a literal never stringifies and a nullish value
+	// still renders empty. Widened here because each token carries one key or
+	// the other, which the public union deliberately does not model.
+	for (const t of /** @type {readonly { literal?: string, value?: unknown }[]} */ (tokens)) s += t.literal ?? String(t.value ?? '');
 	return s;
 };
