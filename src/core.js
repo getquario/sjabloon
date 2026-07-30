@@ -65,6 +65,13 @@ let lex = s => {
 	return out;
 };
 
+// One shared prototype for renders that omit `values` — the shape an embedder
+// passing `{ root, item }` hits on every cell. A fresh `{}` here would give each
+// wrapper its own hidden class, so lookups go megamorphic and such a render
+// costs ~12x one that passes values. Frozen: nothing may write to a prototype
+// shared across renders.
+const EMPTY = Object.freeze({});
+
 // Shared parser state; parsing is synchronous so this is safe.
 // `nms` collects free variables, `fnms` the registry functions called.
 // LIT/VAL/RAW are the compiling profile's node builders — read only while
@@ -318,7 +325,7 @@ export let make = ([lit, val, raw, seed, take]) => {
 		// unbound, so `@.x` throws through xprsn's guard — a group-header band that
 		// has no current row wants exactly that.
 		const f = (v, o) => {
-			v = v || {};
+			v = v || EMPTY;
 			const r = Object.create(v);
 			r['$'] = o ? o.root : v;
 			if (!o) r['@'] = v;

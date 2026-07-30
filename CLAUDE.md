@@ -30,6 +30,8 @@ A recursive parser turns blocks into closures (`#if`/`#elif` chains recurse via 
 
 `#each` scopes are `Object.create(parent)` with the loop variable set as an own key: xprsn's variable lookup walks the prototype chain, so outer variables stay visible for free, and parent values are never mutated.
 
+**`v = v || EMPTY` in the root wrapper is load-bearing, not a tidy-up.** `EMPTY` is one frozen module-level object; substituting a fresh `{}` looks identical in intent and costs ~12× on every render that omits `values`. Each literal gives its wrapper a new hidden class, so xprsn's name lookups go megamorphic — measured at 688 ns vs 56 ns per render. That is precisely the embedder shape (anchors via `{ root, item }`, no `values`), where it was worth ~16% of a downstream report. Renders that do pass `values` are unaffected, so a microbenchmark that always passes them will not show this.
+
 ## Hard constraints
 
 1. **CSP safety is non-negotiable.** Same rules as xprsn: no string-to-code paths, the suite runs under `--disallow-code-generation-from-strings`, and a test scans the source — don't use the words "eval" or "new Function" even in comments.
