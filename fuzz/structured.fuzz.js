@@ -1,8 +1,8 @@
 import assert from 'node:assert';
 import { FuzzedDataProvider } from '@jazzer.js/core';
-import { isDiagnostic, template } from '../src/html.js';
-import { template as rootTemplate, text as joinTokens } from '../src/index.js';
-import { template as textTemplate } from '../src/text.js';
+import { isDiagnostic, template } from '../lib/html.js';
+import { template as rootTemplate, text as joinTokens } from '../lib/index.js';
+import { template as textTemplate } from '../lib/text.js';
 
 // The two editions without a raw form, picked from bytes read after every
 // other consume so the committed corpus keeps its meaning.
@@ -18,7 +18,7 @@ const UNARY = ['!','-','not '];
 const KEYS = ['a','b','c','foo','bar','val','items'];
 const BLOCKED = ['__proto__', 'constructor', 'prototype'];
 // Odd-but-valid loop names alongside blocked ones, to drive the #each binding
-// path (src/index.js) that sjabloon-lk4 hardened.
+// path (lib/index.js) that sjabloon-lk4 hardened.
 const LOOPNAMES = ['it', 'x', 'row', 'loop', '_', 'a', ...BLOCKED];
 // Literal text drawn from a safe alphabet only: no & < > " ', so any of those
 // chars in the output must have come from an interpolation, never the template.

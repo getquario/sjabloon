@@ -5,7 +5,7 @@
 // is small, and lives in editions.test.js and tokens.test.js.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { render, template } from '../src/text.js';
+import { render, template } from '../lib/text.js';
 
 const notOk = (value, message) => assert.ok(!value, message);
 

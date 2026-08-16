@@ -30,12 +30,17 @@ const html = `<!doctype html>
 const files = new Map([
 	['/', ['text/html; charset=utf-8', html]],
 	['/browser.js', ['text/javascript; charset=utf-8', await readFile(new URL('./browser.js', import.meta.url))]],
-	// The entries plus the shared core chunk they both import. `hash: false`
-	// keeps that filename stable, so it can be named here rather than globbed.
-	['/dist/index.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../dist/index.js', import.meta.url))]],
-	['/dist/html.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../dist/html.js', import.meta.url))]],
-	['/dist/core.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../dist/core.js', import.meta.url))]],
-	['/xprsn/index.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../node_modules/xprsn/dist/index.js', import.meta.url))]],
+	// Two entries plus the shared core they both import, served from `lib/`
+	// exactly as published — the relative `./core.js` specifier resolves against
+	// these paths, so no rewriting is needed.
+	['/lib/index.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../lib/index.js', import.meta.url))]],
+	['/lib/html.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../lib/html.js', import.meta.url))]],
+	['/lib/core.js', ['text/javascript; charset=utf-8', await readFile(new URL('../../lib/core.js', import.meta.url))]],
+	// Resolved through the exports map rather than a hardcoded path, so this
+	// keeps working whichever directory xprsn publishes its entry from. The
+	// served URL stays fixed, so the import map — and the CSP hash over it —
+	// are unaffected.
+	['/xprsn/index.js', ['text/javascript; charset=utf-8', await readFile(new URL(import.meta.resolve('xprsn')))]],
 ]);
 
 const server = http.createServer((request, response) => {

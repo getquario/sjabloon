@@ -1,6 +1,6 @@
-import { template as html } from '../src/html.js';
-import { template as root, text } from '../src/index.js';
-import { template as plain } from '../src/text.js';
+import { template as html } from '../lib/html.js';
+import { template as root, text } from '../lib/index.js';
+import { template as plain } from '../lib/text.js';
 
 // Malformed templates and bad expressions surface as SyntaxError at compile
 // time; anything else from template() is a real finding.

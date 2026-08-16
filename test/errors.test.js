@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { compile } from 'xprsn';
-import { isDiagnostic, template } from '../src/html.js';
+import { isDiagnostic, template } from '../lib/html.js';
 
 let caught = fn => {
 	try {

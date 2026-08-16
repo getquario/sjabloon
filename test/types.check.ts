@@ -6,9 +6,9 @@ import {
 	type SjabloonDiagnostic,
 	type SjabloonErrorCode,
 	type Token,
-} from '../src/index.js';
-import { template as htmlTemplate } from '../src/html.js';
-import { template as textTemplate } from '../src/text.js';
+} from '../lib/index.js';
+import { template as htmlTemplate } from '../lib/html.js';
+import { template as textTemplate } from '../lib/text.js';
 
 const render = template('{{ user.name }}');
 const tokens: Token[] = render({ user: { name: 'Robin' } });

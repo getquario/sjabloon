@@ -3,8 +3,8 @@
 // in editions.test.js.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { template, text } from '../src/index.js';
-import { template as plain } from '../src/text.js';
+import { template, text } from '../lib/index.js';
+import { template as plain } from '../lib/text.js';
 
 const lit = literal => ({ literal });
 const val = value => ({ value });

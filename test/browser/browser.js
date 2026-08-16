@@ -1,5 +1,5 @@
-import { isDiagnostic, template as tokenTemplate, text } from '/dist/index.js';
-import { isDiagnostic as htmlIsDiagnostic, render, template } from '/dist/html.js';
+import { isDiagnostic, template as tokenTemplate, text } from '/lib/index.js';
+import { isDiagnostic as htmlIsDiagnostic, render, template } from '/lib/html.js';
 
 const result = document.querySelector('#result');
 const rendered = document.querySelector('#rendered');
