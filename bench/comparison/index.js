@@ -3,7 +3,14 @@ import { createRequire } from 'node:module';
 import Handlebars from 'handlebars';
 import Mustache from 'mustache';
 import { compile as tempura } from 'tempura';
-import { template as sjabloon } from 'sjabloon';
+// The competitors all render strings, so the two string editions are what
+// compare like for like — `sjabloon/text` for the raw workload, `sjabloon/html`
+// for the escaped one. The template source is identical between them; only the
+// edition differs, which is exactly the design.
+import { template as sjabloonText } from 'sjabloon/text';
+import { template as sjabloonHtml } from 'sjabloon/html';
+
+const sjabloon = mode => (mode === 'raw' ? sjabloonText : sjabloonHtml);
 
 const require = createRequire(import.meta.url);
 const versions = {
@@ -15,7 +22,7 @@ const versions = {
 
 const templates = {
 	sjabloon: {
-		raw: '<ul>{{#each list as item}}<li>User: {{{ item.user }}} / Web Site: {{{ item.site }}}</li>{{/each}}</ul>',
+		raw: '<ul>{{#each list as item}}<li>User: {{ item.user }} / Web Site: {{ item.site }}</li>{{/each}}</ul>',
 		escaped: '<ul>{{#each list as item}}<li>User: {{ item.user }} / Web Site: {{ item.site }}</li>{{/each}}</ul>',
 	},
 	tempura: {
@@ -35,9 +42,9 @@ const templates = {
 const engines = [
 	{
 		name: 'sjabloon',
-		prepare: mode => sjabloon(templates.sjabloon[mode]),
-		make: mode => sjabloon(templates.sjabloon[mode]),
-		cold: (mode, data) => sjabloon(templates.sjabloon[mode])(data),
+		prepare: mode => sjabloon(mode)(templates.sjabloon[mode]),
+		make: mode => sjabloon(mode)(templates.sjabloon[mode]),
+		cold: (mode, data) => sjabloon(mode)(templates.sjabloon[mode])(data),
 	},
 	{
 		name: 'tempura',

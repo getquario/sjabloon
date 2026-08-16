@@ -1,24 +1,29 @@
 # Comparison benchmarks
 
-This manual suite compares sjabloon's published build with Tempura, Handlebars,
-and Mustache. It is for understanding performance trade-offs, not declaring a
-universal winner.
+This manual suite compares sjabloon with Tempura, Handlebars, and Mustache. It
+is for understanding performance trade-offs, not declaring a universal winner.
 
-## Results (2026-07-22)
+Competitors render strings, so the two **string editions** are what compare like
+for like: `sjabloon/text` for the raw workload and `sjabloon/html` for the
+escaped one. The template source is identical between them — only the edition
+differs. The root entry is not benchmarked here: it emits `Token[]` rather than
+a string, so there is nothing to compare byte for byte.
 
-One run on Node v24.15.0, macOS arm64. Versions: sjabloon 0.5.0,
+## Results (2026-08-16)
+
+One run on Node v24.18.0, macOS arm64. Versions: sjabloon 0.7.0,
 Tempura 0.4.1, Handlebars 4.7.9, and Mustache 4.2.0. Values are median
 operations per second; the parenthesized number is throughput relative to
 sjabloon.
 
 | Workload | sjabloon | Tempura | Handlebars | Mustache |
 | --- | ---: | ---: | ---: | ---: |
-| Cold raw, 10 rows | 141,282 (1.00x) | 449,340 (3.18x) | 11,625 (0.08x) | 181,530 (1.28x) |
-| Cold escaped, 10 rows | 92,425 (1.00x) | 201,064 (2.18x) | 13,360 (0.14x) | 110,098 (1.19x) |
-| Hot raw, 10 rows | 273,377 (1.00x) | 4,023,469 (14.72x) | 702,353 (2.57x) | 676,996 (2.48x) |
-| Hot raw, 1,000 rows | 4,299 (1.00x) | 47,511 (11.05x) | 11,908 (2.77x) | 8,505 (1.98x) |
-| Hot escaped, 10 rows | 129,849 (1.00x) | 327,335 (2.52x) | 178,732 (1.38x) | 181,501 (1.40x) |
-| Hot escaped, 1,000 rows | 1,579 (1.00x) | 3,419 (2.17x) | 2,045 (1.30x) | 1,880 (1.19x) |
+| Cold raw, 10 rows | 178,949 (1.00x) | 483,076 (2.70x) | 13,728 (0.08x) | 198,490 (1.11x) |
+| Cold escaped, 10 rows | 105,340 (1.00x) | 205,353 (1.95x) | 13,811 (0.13x) | 111,663 (1.06x) |
+| Hot raw, 10 rows | 380,619 (1.00x) | 4,123,696 (10.83x) | 722,157 (1.90x) | 683,304 (1.80x) |
+| Hot raw, 1,000 rows | 7,326 (1.00x) | 49,026 (6.69x) | 12,073 (1.65x) | 8,895 (1.21x) |
+| Hot escaped, 10 rows | 150,419 (1.00x) | 333,899 (2.22x) | 183,846 (1.22x) | 184,984 (1.23x) |
+| Hot escaped, 1,000 rows | 1,889 (1.00x) | 3,471 (1.84x) | 2,071 (1.10x) | 1,902 (1.01x) |
 
 The native-prepare diagnostic is omitted because the engine APIs do different
 amounts of work at that stage.
