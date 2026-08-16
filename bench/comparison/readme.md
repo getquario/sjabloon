@@ -16,14 +16,14 @@ Tempura 0.4.1, Handlebars 4.7.9, and Mustache 4.2.0. Values are median
 operations per second; the parenthesized number is throughput relative to
 sjabloon.
 
-| Workload | sjabloon | Tempura | Handlebars | Mustache |
-| --- | ---: | ---: | ---: | ---: |
-| Cold raw, 10 rows | 178,949 (1.00x) | 483,076 (2.70x) | 13,728 (0.08x) | 198,490 (1.11x) |
-| Cold escaped, 10 rows | 105,340 (1.00x) | 205,353 (1.95x) | 13,811 (0.13x) | 111,663 (1.06x) |
-| Hot raw, 10 rows | 380,619 (1.00x) | 4,123,696 (10.83x) | 722,157 (1.90x) | 683,304 (1.80x) |
-| Hot raw, 1,000 rows | 7,326 (1.00x) | 49,026 (6.69x) | 12,073 (1.65x) | 8,895 (1.21x) |
-| Hot escaped, 10 rows | 150,419 (1.00x) | 333,899 (2.22x) | 183,846 (1.22x) | 184,984 (1.23x) |
-| Hot escaped, 1,000 rows | 1,889 (1.00x) | 3,471 (1.84x) | 2,071 (1.10x) | 1,902 (1.01x) |
+| Workload                |        sjabloon |            Tempura |      Handlebars |        Mustache |
+| ----------------------- | --------------: | -----------------: | --------------: | --------------: |
+| Cold raw, 10 rows       | 178,949 (1.00x) |    483,076 (2.70x) |  13,728 (0.08x) | 198,490 (1.11x) |
+| Cold escaped, 10 rows   | 105,340 (1.00x) |    205,353 (1.95x) |  13,811 (0.13x) | 111,663 (1.06x) |
+| Hot raw, 10 rows        | 380,619 (1.00x) | 4,123,696 (10.83x) | 722,157 (1.90x) | 683,304 (1.80x) |
+| Hot raw, 1,000 rows     |   7,326 (1.00x) |     49,026 (6.69x) |  12,073 (1.65x) |   8,895 (1.21x) |
+| Hot escaped, 10 rows    | 150,419 (1.00x) |    333,899 (2.22x) | 183,846 (1.22x) | 184,984 (1.23x) |
+| Hot escaped, 1,000 rows |   1,889 (1.00x) |      3,471 (1.84x) |   2,071 (1.10x) |   1,902 (1.01x) |
 
 The native-prepare diagnostic is omitted because the engine APIs do different
 amounts of work at that stage.

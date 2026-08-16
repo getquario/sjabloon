@@ -1,14 +1,14 @@
 {
-	"name": "sjabloon-comparison-bench",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"bench": "node index.js"
-	},
-	"dependencies": {
-		"handlebars": "^4.7.9",
-		"mustache": "^4.2.0",
-		"sjabloon": "file:../..",
-		"tempura": "^0.4.1"
-	}
+  "name": "sjabloon-comparison-bench",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bench": "node index.js"
+  },
+  "dependencies": {
+    "handlebars": "^4.7.9",
+    "mustache": "^4.2.0",
+    "sjabloon": "file:../..",
+    "tempura": "^0.4.1"
+  }
 }

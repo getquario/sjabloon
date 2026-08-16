@@ -13,31 +13,31 @@ A tiny, CSP-safe, target-neutral template engine for JavaScript. **~1.9KB min+br
 	</picture>
 </a>
 
-*Sjabloon* is Dutch for "template". It renders templates with full [xprsn](https://github.com/getquario/xprsn) expressions inside every tag, without turning template text into JavaScript. There is no `eval` and no `new Function`, so it runs under a strict Content Security Policy where engines that compile templates to code cannot.
+_Sjabloon_ is Dutch for "template". It renders templates with full [xprsn](https://github.com/getquario/xprsn) expressions inside every tag, without turning template text into JavaScript. There is no `eval` and no `new Function`, so it runs under a strict Content Security Policy where engines that compile templates to code cannot.
 
 The engine emits **tokens**, not text. A render gives you the literal runs and the interpolated values, interleaved in render order — because different targets need different things from the same template. HTML wants escaped text; a spreadsheet wants the number `1000` and a cell format; a PDF wants styled runs. Escaping belongs at the output edge, not in the engine, so a string is just one way to consume the stream.
 
 ```js
-import { template, text } from 'sjabloon';
+import { template, text } from "sjabloon";
 
-const cell = template('{{ total * 1.21 }}');
+const cell = template("{{ total * 1.21 }}");
 
-cell({ total: 1000 });        // => [{ value: 1210 }]      — still a number
-text(cell({ total: 1000 }));  // => '1210'                 — when you want the string
+cell({ total: 1000 }); // => [{ value: 1210 }]      — still a number
+text(cell({ total: 1000 })); // => '1210'                 — when you want the string
 ```
 
 If you only want a string, import the edition that produces one directly:
 
 ```js
-import { render } from 'sjabloon/html';   // {{ }} HTML-escapes, {{{ }}} is raw
+import { render } from "sjabloon/html"; // {{ }} HTML-escapes, {{{ }}} is raw
 
 render(
   `<ul>{{#each items as it, i}}
     <li>{{ i + 1 }}. {{ it.name }}: {{ fmt(it.price * it.qty) }}</li>
   {{/each}}</ul>
   {{#if total >= 100 and "vip" in user.roles}}Free shipping!{{#else}}Shipping: {{ fmt(5) }}{{/if}}`,
-  { items: [{ name: 'Koffie', price: 8, qty: 2 }], total: 120, user: { roles: ['vip'] } },
-  { fmt: n => '€' + n.toFixed(2) }
+  { items: [{ name: "Koffie", price: 8, qty: 2 }], total: 120, user: { roles: ["vip"] } },
+  { fmt: (n) => "€" + n.toFixed(2) },
 );
 ```
 
@@ -45,11 +45,11 @@ render(
 
 Three entry points, one engine. They share a parser, a syntax, and a diagnostics contract, and differ only in what a render produces.
 
-| Import | `template(str, funcs?)` returns | `{{ expr }}` | `{{{ expr }}}` |
-| --- | --- | --- | --- |
-| `sjabloon` | `(values?, scope?) => Token[]` | value token | `SyntaxError` |
-| `sjabloon/text` | `(values?, scope?) => string` | unescaped | `SyntaxError` |
-| `sjabloon/html` | `(values?, scope?) => string` | HTML-escaped | raw |
+| Import          | `template(str, funcs?)` returns | `{{ expr }}` | `{{{ expr }}}` |
+| --------------- | ------------------------------- | ------------ | -------------- |
+| `sjabloon`      | `(values?, scope?) => Token[]`  | value token  | `SyntaxError`  |
+| `sjabloon/text` | `(values?, scope?) => string`   | unescaped    | `SyntaxError`  |
+| `sjabloon/html` | `(values?, scope?) => string`   | HTML-escaped | raw            |
 
 `{{{ }}}` exists only in the HTML edition, where "raw" means something. Everywhere else `{{ }}` is already raw, so the triple form is a compile-time `SJABLOON_RAW_TAG` error rather than a silent synonym.
 
@@ -64,16 +64,18 @@ Compiles the template and returns a renderer. What it renders to depends on the 
 The anchors `$` (root) and `@` (current `{{#each}}` item) work as [described below](#syntax) with no extra arguments — at the root, before any loop, both point at `values`. If you're embedding sjabloon under an engine with its own scope model, pass `{ root, item }` as the second argument to seed the two root anchors from distinct objects: `$` becomes `root` and `@` becomes `item`. Omit `item` and `@` stays unbound at the root, so reading `@.x` throws where there is no current item. Either way, `{{#each}}` still re-points `@` to the current item inside its body.
 
 ```js
-const tpl = template('{{ $.report }} — {{ @.row }}');
+const tpl = template("{{ $.report }} — {{ @.row }}");
 tpl(base, { root: reportRoot, item: currentRow }); // $ = reportRoot, @ = currentRow
-tpl(base, { root: reportRoot });                   // no item → @.x throws
+tpl(base, { root: reportRoot }); // no item → @.x throws
 ```
 
 The renderer carries `names` (every variable the template reads from your values, loop variables excluded) and `functions` (the registry functions it calls, methods excluded), both deduplicated. Check a stored template against your data model and its allowed functions before you render it, or fetch only the fields it needs.
 
 ```js
-const tpl = template('{{ fmt(title) }}{{#each items as it}}{{ it.name }}{{/each}}', { fmt: s => s });
-tpl.names;     // => ['title', 'items']
+const tpl = template("{{ fmt(title) }}{{#each items as it}}{{ it.name }}{{/each}}", {
+  fmt: (s) => s,
+});
+tpl.names; // => ['title', 'items']
 tpl.functions; // => ['fmt']
 ```
 
@@ -86,9 +88,9 @@ Shorthand for `template(str, functions)(values)`, returning whatever its edition
 Joins a token stream the way `sjabloon/text` would have rendered it: literals verbatim, values as `String(value ?? '')`. `text(template(str)(values))` and `sjabloon/text`'s `template(str)(values)` are equal for every template and every set of values — a property the test suite and the fuzzer both check.
 
 ```js
-import { template, text } from 'sjabloon';
+import { template, text } from "sjabloon";
 
-const tokens = template('{{ qty }} × {{ name }}')({ qty: 2, name: 'Koffie' });
+const tokens = template("{{ qty }} × {{ name }}")({ qty: 2, name: "Koffie" });
 // => [{ value: 2 }, { literal: ' × ' }, { value: 'Koffie' }]
 
 text(tokens); // => '2 × Koffie'
@@ -98,7 +100,7 @@ A `Token` is either `{ literal: string }` or `{ value: unknown }`:
 
 - **Values are pre-stringify.** `{{ total }}` holding `1000` yields the number `1000`, not `"1000"`, and nullish stays nullish. Stringification is deferred to `text()` — so a value with no primitive conversion reaches the stream intact and only fails when something asks for text.
 - **Order is render order.** Loop bodies append once per iteration, untaken branches append nothing, and block expressions (`#if` conditions, `#each` collections) never appear — they steer the render rather than being part of it.
-- **Literals are the template's static runs**, one token each, never merged and never empty. So the interleaving tells you the shape: a bare `{{ amount }}` is exactly one value token, while `Total: {{ amount }}` is a literal followed by a value. That distinction is why the engine emits tokens instead of a string plus a list of values — a spreadsheet cell that is *only* a number is a different thing from one that happens to contain one.
+- **Literals are the template's static runs**, one token each, never merged and never empty. So the interleaving tells you the shape: a bare `{{ amount }}` is exactly one value token, while `Total: {{ amount }}` is a literal followed by a value. That distinction is why the engine emits tokens instead of a string plus a list of values — a spreadsheet cell that is _only_ a number is a different thing from one that happens to contain one.
 
 Literal tokens are frozen and shared across loop iterations; value tokens are fresh per emit.
 
@@ -119,17 +121,17 @@ Use `isDiagnostic(error)` when a host needs to distinguish those errors. It retu
 
 ## Syntax
 
-| Tag | Meaning |
-| --- | --- |
-| `{{ expr }}` | Interpolate an expression — a value token, or text escaped per edition |
-| `{{{ expr }}}` | Interpolate raw. **`sjabloon/html` only**; a `SyntaxError` elsewhere |
-| `{{#if expr}} … {{#elif expr}} … {{#else}} … {{/if}}` | Conditional block, with as many `{{#elif}}` links as you need |
-| `{{#each expr as item}} … {{/each}}` | Loop over an array or an object's values |
-| `{{#each expr as item, key}} … {{/each}}` | Second name binds the index (arrays) or the key (objects) |
-| `{{#each expr as item}} … {{#else}} … {{/each}}` | The `{{#else}}` branch renders when the collection is empty or missing |
-| `{{ loop.last }}` (inside `{{#each}}`) | Iteration metadata: `index` (1-based), `index0`, `first`, `last`, `length` |
-| `{{! anything }}` | Comment, removed from output |
-| `{{- expr -}}` | A dash hugging either brace trims the whitespace on that side, newlines included; works on every tag form |
+| Tag                                                   | Meaning                                                                                                   |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `{{ expr }}`                                          | Interpolate an expression — a value token, or text escaped per edition                                    |
+| `{{{ expr }}}`                                        | Interpolate raw. **`sjabloon/html` only**; a `SyntaxError` elsewhere                                      |
+| `{{#if expr}} … {{#elif expr}} … {{#else}} … {{/if}}` | Conditional block, with as many `{{#elif}}` links as you need                                             |
+| `{{#each expr as item}} … {{/each}}`                  | Loop over an array or an object's values                                                                  |
+| `{{#each expr as item, key}} … {{/each}}`             | Second name binds the index (arrays) or the key (objects)                                                 |
+| `{{#each expr as item}} … {{#else}} … {{/each}}`      | The `{{#else}}` branch renders when the collection is empty or missing                                    |
+| `{{ loop.last }}` (inside `{{#each}}`)                | Iteration metadata: `index` (1-based), `index0`, `first`, `last`, `length`                                |
+| `{{! anything }}`                                     | Comment, removed from output                                                                              |
+| `{{- expr -}}`                                        | A dash hugging either brace trims the whitespace on that side, newlines included; works on every tag form |
 
 Every `expr` is an [xprsn expression](https://github.com/getquario/xprsn#syntax): literals, arithmetic, string concatenation with `~` (`{{ first ~ " " ~ last }}`), comparisons, `and`/`or`/`not`/`in`, ternaries, property and method access, and functions from the registry you pass in. `null` and `undefined` render as empty strings.
 
@@ -138,7 +140,7 @@ A loop body sees its loop variable plus the outer scope; reusing an outer name s
 Inside `{{#each}}`, a `loop` object holds the iteration state: `index` (1-based), `index0`, `first`, `last`, and `length`. Use `loop.last` for separators and trailing borders, or `loop.index` with `loop.length` for "row X of Y". Each nested loop gets its own.
 
 ```js
-render('{{#each xs as x}}{{ x }}{{#if not loop.last}}, {{/if}}{{/each}}', { xs: ['a', 'b', 'c'] });
+render("{{#each xs as x}}{{ x }}{{#if not loop.last}}, {{/if}}{{/each}}", { xs: ["a", "b", "c"] });
 // => 'a, b, c'
 ```
 
@@ -146,8 +148,8 @@ Two anchors are always in scope: `$` is the root values and `@` is the current `
 
 ```js
 render(
-  '{{#each regions as company}}{{ company }} of {{ $.company }}: {{#each rows as r}}{{ @.n }} {{/each}}{{/each}}',
-  { company: 'ACME', regions: ['North', 'South'], rows: [{ n: 1 }, { n: 2 }] }
+  "{{#each regions as company}}{{ company }} of {{ $.company }}: {{#each rows as r}}{{ @.n }} {{/each}}{{/each}}",
+  { company: "ACME", regions: ["North", "South"], rows: [{ n: 1 }, { n: 2 }] },
 );
 // => 'North of ACME: 1 2 South of ACME: 1 2 '
 ```

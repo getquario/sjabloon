@@ -1,103 +1,106 @@
 {
-	"name": "sjabloon",
-	"version": "0.8.0",
-	"description": "Tiny, CSP-safe template engine for JavaScript, powered by xprsn expressions. No eval, no new Function.",
-	"repository": "getquario/sjabloon",
-	"license": "Apache-2.0",
-	"author": {
-		"name": "Robin van der Vleuten",
-		"email": "robin@webstronauts.com",
-		"url": "https://robinvdvleuten.nl"
-	},
-	"type": "module",
-	"module": "lib/index.js",
-	"types": "lib/index.d.ts",
-	"exports": {
-		".": {
-			"types": "./lib/index.d.ts",
-			"default": "./lib/index.js"
-		},
-		"./text": {
-			"types": "./lib/text.d.ts",
-			"default": "./lib/text.js"
-		},
-		"./html": {
-			"types": "./lib/html.d.ts",
-			"default": "./lib/html.js"
-		},
-		"./package.json": "./package.json"
-	},
-	"engines": {
-		"node": ">=22.12.0"
-	},
-	"files": [
-		"lib"
-	],
-	"size-limit": [
-		{
-			"name": "sjabloon",
-			"path": "lib/index.js",
-			"ignore": [
-				"xprsn"
-			],
-			"limit": "1.95 kB"
-		},
-		{
-			"name": "sjabloon/text",
-			"path": "lib/text.js",
-			"ignore": [
-				"xprsn"
-			],
-			"limit": "1.9 kB"
-		},
-		{
-			"name": "sjabloon/html",
-			"path": "lib/html.js",
-			"ignore": [
-				"xprsn"
-			],
-			"limit": "1.97 kB"
-		}
-	],
-	"scripts": {
-		"bench": "node --disallow-code-generation-from-strings bench/index.js",
-		"bench:comparison": "npm --prefix bench/comparison run bench",
-		"check": "run-s lint size test fuzz:regression test:browser",
-		"fuzz": "npm run fuzz:prepare && run-s fuzz:compile fuzz:render fuzz:structured",
-		"fuzz:compile": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/compile.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync .fuzz-corpus/compile fuzz/corpus/compile -- -max_total_time=60 -use_value_profile=1 -dict=fuzz/sjabloon.dict -artifact_prefix=fuzz/",
-		"fuzz:prepare": "node -e \"for (const x of ['compile','render','structured']) require('fs').mkdirSync('.fuzz-corpus/'+x,{recursive:true})\"",
-		"fuzz:regression": "run-s fuzz:regression:compile fuzz:regression:render fuzz:regression:structured",
-		"fuzz:regression:compile": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/compile.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync --mode=regression fuzz/corpus/compile -- -artifact_prefix=fuzz/",
-		"fuzz:regression:render": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/render.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync --mode=regression fuzz/corpus/render -- -artifact_prefix=fuzz/",
-		"fuzz:regression:structured": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/structured.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync --mode=regression fuzz/corpus/structured -- -artifact_prefix=fuzz/",
-		"fuzz:render": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/render.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync .fuzz-corpus/render fuzz/corpus/render -- -max_total_time=60 -use_value_profile=1 -dict=fuzz/sjabloon.dict -artifact_prefix=fuzz/",
-		"fuzz:structured": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/structured.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync .fuzz-corpus/structured fuzz/corpus/structured -- -max_total_time=60 -use_value_profile=1 -dict=fuzz/sjabloon.dict -artifact_prefix=fuzz/",
-		"lint": "oxlint --deny-warnings",
-		"size": "size-limit",
-		"test": "run-s test:unit test:types",
-		"test:browser": "playwright install chromium && node test/browser/harness.js",
-		"test:types": "tsc && attw --pack . --profile esm-only",
-		"test:unit": "node --disallow-code-generation-from-strings --test --test-concurrency=1 test/*.test.js"
-	},
-	"keywords": [
-		"template",
-		"template-engine",
-		"csp",
-		"render",
-		"handlebars"
-	],
-	"dependencies": {
-		"xprsn": "^0.9.0"
-	},
-	"devDependencies": {
-		"@arethetypeswrong/cli": "^0.18.3",
-		"@jazzer.js/bug-detectors": "^4.0.0",
-		"@jazzer.js/core": "^4.0.0",
-		"@size-limit/preset-small-lib": "^12.1.0",
-		"npm-run-all": "^4.1.5",
-		"oxlint": "^1.78.0",
-		"playwright": "^1.61.1",
-		"size-limit": "^12.1.0",
-		"typescript": "7.0.2"
-	}
+  "name": "sjabloon",
+  "version": "0.8.0",
+  "description": "Tiny, CSP-safe template engine for JavaScript, powered by xprsn expressions. No eval, no new Function.",
+  "keywords": [
+    "csp",
+    "handlebars",
+    "render",
+    "template",
+    "template-engine"
+  ],
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Robin van der Vleuten",
+    "email": "robin@webstronauts.com",
+    "url": "https://robinvdvleuten.nl"
+  },
+  "repository": "getquario/sjabloon",
+  "files": [
+    "lib"
+  ],
+  "type": "module",
+  "module": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./text": {
+      "types": "./lib/text.d.ts",
+      "default": "./lib/text.js"
+    },
+    "./html": {
+      "types": "./lib/html.d.ts",
+      "default": "./lib/html.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "bench": "node --disallow-code-generation-from-strings bench/index.js",
+    "bench:comparison": "npm --prefix bench/comparison run bench",
+    "check": "run-s fmt:check lint size test fuzz:regression test:browser",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "fuzz": "npm run fuzz:prepare && run-s fuzz:compile fuzz:render fuzz:structured",
+    "fuzz:compile": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/compile.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync .fuzz-corpus/compile fuzz/corpus/compile -- -max_total_time=60 -use_value_profile=1 -dict=fuzz/sjabloon.dict -artifact_prefix=fuzz/",
+    "fuzz:prepare": "node -e \"for (const x of ['compile','render','structured']) require('fs').mkdirSync('.fuzz-corpus/'+x,{recursive:true})\"",
+    "fuzz:regression": "run-s fuzz:regression:compile fuzz:regression:render fuzz:regression:structured",
+    "fuzz:regression:compile": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/compile.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync --mode=regression fuzz/corpus/compile -- -artifact_prefix=fuzz/",
+    "fuzz:regression:render": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/render.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync --mode=regression fuzz/corpus/render -- -artifact_prefix=fuzz/",
+    "fuzz:regression:structured": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/structured.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync --mode=regression fuzz/corpus/structured -- -artifact_prefix=fuzz/",
+    "fuzz:render": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/render.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync .fuzz-corpus/render fuzz/corpus/render -- -max_total_time=60 -use_value_profile=1 -dict=fuzz/sjabloon.dict -artifact_prefix=fuzz/",
+    "fuzz:structured": "NODE_OPTIONS=--disallow-code-generation-from-strings jazzer fuzz/structured.fuzz.js -i lib/ --customHooks fuzz/hooks.js --disableBugDetectors='command-injection|path-traversal|ssrf' --sync .fuzz-corpus/structured fuzz/corpus/structured -- -max_total_time=60 -use_value_profile=1 -dict=fuzz/sjabloon.dict -artifact_prefix=fuzz/",
+    "lint": "oxlint --deny-warnings",
+    "size": "size-limit",
+    "test": "run-s test:unit test:types",
+    "test:browser": "playwright install chromium && node test/browser/harness.js",
+    "test:types": "tsc && attw --pack . --profile esm-only",
+    "test:unit": "node --disallow-code-generation-from-strings --test --test-concurrency=1 test/*.test.js"
+  },
+  "dependencies": {
+    "xprsn": "^0.9.0"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.3",
+    "@jazzer.js/bug-detectors": "^4.0.0",
+    "@jazzer.js/core": "^4.0.0",
+    "@size-limit/preset-small-lib": "^12.1.0",
+    "npm-run-all": "^4.1.5",
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "playwright": "^1.61.1",
+    "size-limit": "^12.1.0",
+    "typescript": "7.0.2"
+  },
+  "size-limit": [
+    {
+      "name": "sjabloon",
+      "path": "lib/index.js",
+      "ignore": [
+        "xprsn"
+      ],
+      "limit": "1.95 kB"
+    },
+    {
+      "name": "sjabloon/text",
+      "path": "lib/text.js",
+      "ignore": [
+        "xprsn"
+      ],
+      "limit": "1.9 kB"
+    },
+    {
+      "name": "sjabloon/html",
+      "path": "lib/html.js",
+      "ignore": [
+        "xprsn"
+      ],
+      "limit": "1.97 kB"
+    }
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  }
 }

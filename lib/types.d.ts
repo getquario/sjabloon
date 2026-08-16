@@ -1,26 +1,26 @@
-import type { XprsnErrorCode } from 'xprsn';
+import type { XprsnErrorCode } from "xprsn";
 
 export type SjabloonErrorCode =
-    | XprsnErrorCode
-    | 'SJABLOON_EACH_SYNTAX'
-    | 'SJABLOON_BLOCKED_BINDING'
-    | 'SJABLOON_UNEXPECTED_TAG'
-    | 'SJABLOON_UNKNOWN_BLOCK'
-    | 'SJABLOON_UNCLOSED_BLOCK'
-    | 'SJABLOON_TOO_DEEP'
-    | 'SJABLOON_RAW_TAG';
+  | XprsnErrorCode
+  | "SJABLOON_EACH_SYNTAX"
+  | "SJABLOON_BLOCKED_BINDING"
+  | "SJABLOON_UNEXPECTED_TAG"
+  | "SJABLOON_UNKNOWN_BLOCK"
+  | "SJABLOON_UNCLOSED_BLOCK"
+  | "SJABLOON_TOO_DEEP"
+  | "SJABLOON_RAW_TAG";
 
 export interface SjabloonBlock {
-    readonly type: 'if' | 'each';
-    readonly start: number;
-    readonly end: number;
+  readonly type: "if" | "each";
+  readonly start: number;
+  readonly end: number;
 }
 
 export interface SjabloonDiagnostic extends Error {
-    readonly code: SjabloonErrorCode;
-    readonly start: number;
-    readonly end: number;
-    readonly blocks: readonly SjabloonBlock[];
+  readonly code: SjabloonErrorCode;
+  readonly start: number;
+  readonly end: number;
+  readonly blocks: readonly SjabloonBlock[];
 }
 
 export type SjabloonValues = Record<string, any>;
@@ -41,8 +41,8 @@ export type SjabloonFunctions = Record<string, Function>;
  * band that has no current row wants exactly that.
  */
 export interface SjabloonScope {
-    root?: any;
-    item?: any;
+  root?: any;
+  item?: any;
 }
 
 /**
@@ -53,19 +53,19 @@ export interface SjabloonScope {
  * registry functions the template calls, deduplicated.
  */
 export interface SjabloonRenderer<T> {
-    (values?: SjabloonValues, scope?: SjabloonScope): T;
-    names: string[];
-    functions: string[];
+  (values?: SjabloonValues, scope?: SjabloonScope): T;
+  names: string[];
+  functions: string[];
 }
 
 /** One static text run of the template, verbatim. */
 export interface LiteralToken {
-    literal: string;
+  literal: string;
 }
 
 /** One `{{ }}` interpolation, pre-stringify. Nullish values are preserved. */
 export interface ValueToken {
-    value: unknown;
+  value: unknown;
 }
 
 /**

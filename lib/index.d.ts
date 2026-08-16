@@ -1,5 +1,5 @@
-export * from './types.js';
-import type { SjabloonFunctions, SjabloonRenderer, SjabloonValues, Token } from './types.js';
+export * from "./types.js";
+import type { SjabloonFunctions, SjabloonRenderer, SjabloonValues, Token } from "./types.js";
 
 /**
  * Compile a template once, render it many times to a token stream.
