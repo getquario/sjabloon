@@ -86,7 +86,7 @@
 		"handlebars"
 	],
 	"dependencies": {
-		"xprsn": "^0.8.0"
+		"xprsn": "^0.9.0"
 	},
 	"devDependencies": {
 		"@arethetypeswrong/cli": "^0.18.3",
