@@ -3,9 +3,9 @@
 // leaf interpolation emits, and whether {{{ }}} is legal.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import * as html from '../src/html.js';
-import * as root from '../src/index.js';
-import * as plain from '../src/text.js';
+import * as html from '../lib/html.js';
+import * as root from '../lib/index.js';
+import * as plain from '../lib/text.js';
 
 let caught = fn => {
 	try {

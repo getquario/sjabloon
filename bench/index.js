@@ -1,8 +1,8 @@
 // Manual micro- and scaling benchmarks for sjabloon. Run with `npm run bench`.
 import assert from 'node:assert/strict';
-import { render, template } from '../src/html.js';
-import { template as tokenTemplate, text } from '../src/index.js';
-import { template as textTemplate } from '../src/text.js';
+import { render, template } from '../lib/html.js';
+import { template as tokenTemplate, text } from '../lib/index.js';
+import { template as textTemplate } from '../lib/text.js';
 
 let sink = 0;
 
