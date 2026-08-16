@@ -226,6 +226,6 @@ test('runaway elif chains stay a typed SyntaxError through the overflow backstop
 	const deep = '{{#if a}}' + '{{#elif a}}'.repeat(n) + '{{/if}}';
 	const e = caught(() => template(deep));
 	assert.ok(e instanceof SyntaxError, 'a SyntaxError, not a RangeError');
-	assert.ok(/_TOO_DEEP$/.test(e.code), 'a typed too-deep code');
+	assert.ok(e.code.endsWith('_TOO_DEEP'), 'a typed too-deep code');
 	assert.ok(isDiagnostic(e), 'authenticated as a sjabloon diagnostic');
 });

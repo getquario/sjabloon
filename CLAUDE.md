@@ -4,7 +4,8 @@ Tiny, CSP-safe template engine powered by xprsn expressions. Zero-config sibling
 
 ## Commands
 
-- `npm run check` — the complete pull-request CI quality gate: size budgets, unit/types, deterministic fuzz regression, and browser CSP coverage. **There is no build step.**
+- `npm run check` — the complete pull-request CI quality gate: lint, size budgets, unit/types, deterministic fuzz regression, and browser CSP coverage. **There is no build step.**
+- `npm run lint` — oxlint on its default (correctness) ruleset with `--deny-warnings`, so any warning fails. It runs first in `check` because it is the cheapest step.
 - **Non-negotiable: run `npm run check` before declaring any work done.** Passing unit tests alone is not done — a change is complete only when the full gate above is green. Never say "done", close an issue, or hand off without it.
 - `npm test` — Node's built-in test runner under `--disallow-code-generation-from-strings` (strict-CSP simulation), then `npm run test:types`: a plain `tsc` that type-checks `lib/` **and** `test/types.check.ts` in one pass, followed by `attw` against a packed tarball. `types.check.ts` imports `../lib/*.js` directly; `attw` is what now covers the `exports` map's `types` conditions those direct imports cannot see. Keep this on Node: Bun accepts that V8 flag but does not enforce it.
 - `npm run size` — size-limit bundles and minifies each entry itself and checks it against the budget in `package.json`, with `xprsn` in each `ignore` list so the number stays sjabloon's own code. There is no separate core-chunk row: the bundler follows `./core.js` from each entry, so each budget already covers the shared code that entry actually reaches. It measures **brotli**, not gzip.
@@ -74,4 +75,5 @@ Apply this across the whole project: implementation, API design, tests, document
   3. `stripInternal` does not strip JSDoc `@typedef` ([TypeScript #38444](https://github.com/microsoft/TypeScript/issues/38444)), so anything that did emit would publish `Tok` and the internal `Node` type as API. dts-buddy strips the `@internal` tag from the comment but still emits the type, so it is not a way around this either.
 
   None of these are TypeScript 7 problems — TS 5.9 behaves identically. ESLint and execa hand-write their declarations for the same reasons.
+- **`no-unused-expressions` is suppressed per line, never per glob.** The `cond || fault()` guard idiom and the `LIT = lit, VAL = val, RAW = raw` sequence trip it 8 times in `lib/core.js`, each carrying its own `// oxlint-disable-line no-unused-expressions`. Do not "tidy" these into one `.oxlintrc.json` override: the rule staying live in that file is what still catches a genuinely dead statement in the shared core. Verify by adding `DEPTH;` next to a suppressed line and confirming `npm run lint` fails.
 - Tests that scan sources use `globSync(`lib/**/*.js`)`, never a hardcoded filename — a scan pinned to one path keeps passing after a module moves, covering nothing. The call site already fails loudly on an empty match, so the glob needs no extra guard.
