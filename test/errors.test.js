@@ -270,7 +270,11 @@ test("compiled renderer remains reusable after a runtime diagnostic", () => {
 });
 
 test("provenance survives later WeakSet prototype replacement", () => {
+  // Captured to restore in `finally`, never called — `unbound-method` reads the
+  // saving of a prototype method as the scoping hazard of calling one.
+  // oxlint-disable-next-line typescript/unbound-method
   const add = WeakSet.prototype.add;
+  // oxlint-disable-next-line typescript/unbound-method
   const has = WeakSet.prototype.has;
   try {
     WeakSet.prototype.add = () => {

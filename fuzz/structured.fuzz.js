@@ -265,6 +265,7 @@ function assertEscaped(out) {
 // Blocked-key reads must throw TypeError through xprsn's guard, across the same
 // shapes the parser exposes; hash keys with blocked names must not pollute.
 (function assertGuards() {
+  /** @type {[string, Record<string, unknown>][]} */
   const reads = [
     ["{{ base.__proto__ }}", { base: {} }],
     ['{{ base["constructor"] }}', { base: {} }],
@@ -288,7 +289,11 @@ function assertEscaped(out) {
 // catching reassignment/deletion the detector's docs say it can miss.
 const OP = Object.prototype;
 const PROTO_KEYS = Object.getOwnPropertyNames(OP).length;
+// Captured for identity comparison alone, never called — `unbound-method` reads
+// pinning a prototype method as the scoping hazard of calling one.
+// oxlint-disable-next-line typescript/unbound-method
 const PROTO_HAS_OWN = OP.hasOwnProperty;
+// oxlint-disable-next-line typescript/unbound-method
 const PROTO_TO_STRING = OP.toString;
 const protoIntact = () =>
   Object.getOwnPropertyNames(OP).length === PROTO_KEYS &&
