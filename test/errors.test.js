@@ -132,6 +132,37 @@ test("malformed branch controls fail inside their block", () => {
   }
 });
 
+test("closers must match the stop tag exactly", () => {
+  assert.throws(
+    () => template("{{#if a}}x{{#else}}y{{/if extra}}"),
+    /Unexpected \{\{\/if extra\}\}/,
+  );
+  assert.throws(
+    () => template("{{#each xs as x}}x{{#else}}y{{/each extra}}"),
+    /Unexpected \{\{\/each extra\}\}/,
+  );
+  assert.throws(
+    () => template("{{#each xs as x}}x{{/each extra}}"),
+    /Unexpected \{\{\/each extra\}\}/,
+    "each body stop tags compare exact",
+  );
+  assert.throws(
+    () => template("{{#each xs as x}}x{{#else nope}}y{{/each}}"),
+    /Unexpected \{\{#else nope\}\}/,
+  );
+});
+
+test("each rejects foreign closers and elif", () => {
+  assert.throws(() => template("{{#each xs as x}}x{{/if}}"), /Unexpected \{\{\/if\}\}/);
+  assert.throws(() => template("{{#each xs as x}}x{{#elif a}}y{{/each}}"), /Unexpected \{\{#elif/);
+});
+
+test("bare if/elif/else openers are unexpected", () => {
+  assert.throws(() => template("{{#if}}x{{/if}}"), /Unexpected \{\{#if\}\}/);
+  assert.throws(() => template("{{#elif a}}x{{/elif}}"), /Unexpected \{\{#elif/);
+  assert.throws(() => template("{{#else}}x{{/else}}"), /Unexpected \{\{#else\}\}/);
+});
+
 test("each else stays in block context and outside binding scope", () => {
   const src = "{{#each rows as r}}x{{#else}}{{ missing.value }}{{/each}}";
   const f = template(src);
@@ -308,11 +339,12 @@ test("deeply nested blocks surface as a typed SyntaxError, not a stack overflow"
   assert.ok(isDiagnostic(e), "authenticated as a sjabloon diagnostic");
 });
 
-test("runaway elif chains stay a typed SyntaxError through the overflow backstop", () => {
-  const n = 100000;
+test("runaway elif chains stay a typed SyntaxError through the depth budget", () => {
+  const n = 300;
   const deep = "{{#if a}}" + "{{#elif a}}".repeat(n) + "{{/if}}";
   const e = caught(() => template(deep));
   assert.ok(e instanceof SyntaxError, "a SyntaxError, not a RangeError");
-  assert.ok(e.code.endsWith("_TOO_DEEP"), "a typed too-deep code");
+  assert.strictEqual(e.code, "SJABLOON_TOO_DEEP");
+  assert.strictEqual(e.blocks.length, 1, "elif links do not pollute block context");
   assert.ok(isDiagnostic(e), "authenticated as a sjabloon diagnostic");
 });

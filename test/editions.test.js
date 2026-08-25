@@ -23,6 +23,8 @@ test("escaping is html only", () => {
     html.render("{{ x }}", { x: "<script>alert(1)</script>" }),
     "&lt;script&gt;alert(1)&lt;/script&gt;",
   );
+  assert.strictEqual(html.render("[{{ x }}]", { x: null }), "[]", "nullish escapes to empty");
+  assert.strictEqual(html.render("[{{ missing }}]", {}), "[]", "missing escapes to empty");
   assert.strictEqual(
     plain.render("{{ x }}", evil),
     "<b>&\"'</b>",
