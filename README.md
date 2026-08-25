@@ -15,15 +15,25 @@ A tiny, CSP-safe, target-neutral template engine for JavaScript. **~1.9KB min+br
 
 _Sjabloon_ is Dutch for "template". It renders templates with full [xprsn](https://github.com/getquario/xprsn) expressions inside every tag, without turning template text into JavaScript. There is no `eval` and no `new Function`, so it runs under a strict Content Security Policy where engines that compile templates to code cannot.
 
-The engine emits **tokens**, not text. A render gives you the literal runs and the interpolated values, interleaved in render order — because different targets need different things from the same template. HTML wants escaped text; a spreadsheet wants the number `1000` and a cell format; a PDF wants styled runs. Escaping belongs at the output edge, not in the engine, so a string is just one way to consume the stream.
+The engine emits **tokens**, not text. A render gives you the literal runs and the interpolated values, interleaved in render order. Different targets need different things from the same template: HTML wants escaped text, a spreadsheet wants the number `1000` and a cell format. Escaping belongs at the output edge, not in the engine, so a string is just one way to consume the stream.
+
+## Install
+
+```bash
+npm install sjabloon
+```
+
+Node.js 22.12 or newer, ESM only.
+
+## Usage
 
 ```js
 import { template, text } from "sjabloon";
 
 const cell = template("{{ total * 1.21 }}");
 
-cell({ total: 1000 }); // => [{ value: 1210 }]      — still a number
-text(cell({ total: 1000 })); // => '1210'                 — when you want the string
+cell({ total: 1000 }); // => [{ value: 1210 }]      // still a number
+text(cell({ total: 1000 })); // => '1210'                 // when you want the string
 ```
 
 If you only want a string, import the edition that produces one directly:
@@ -51,7 +61,7 @@ Three entry points, one engine. They share a parser, a syntax, and a diagnostics
 | `sjabloon/text` | `(values?, scope?) => string`   | unescaped    | `SyntaxError`  |
 | `sjabloon/html` | `(values?, scope?) => string`   | HTML-escaped | raw            |
 
-`{{{ }}}` exists only in the HTML edition, where "raw" means something. Everywhere else `{{ }}` is already raw, so the triple form is a compile-time `SJABLOON_RAW_TAG` error rather than a silent synonym.
+`{{{ }}}` exists only in the HTML edition, where "raw" means something. Everywhere else `{{ }}` is already raw, so the triple form is a compile-time `SJABLOON_RAW_TAG` error.
 
 Every edition exports `template`, `render`, and `isDiagnostic`. They all resolve to one shared core, so a diagnostic thrown through any of them authenticates through all of them.
 
@@ -61,10 +71,10 @@ Every edition exports `template`, `render`, and `isDiagnostic`. They all resolve
 
 Compiles the template and returns a renderer. What it renders to depends on the edition you imported from (see [Editions](#editions)); everything else on this page is identical across all three. Malformed tags, unclosed blocks, and invalid expressions throw a `SyntaxError` at compile time.
 
-The anchors `$` (root) and `@` (current `{{#each}}` item) work as [described below](#syntax) with no extra arguments — at the root, before any loop, both point at `values`. If you're embedding sjabloon under an engine with its own scope model, pass `{ root, item }` as the second argument to seed the two root anchors from distinct objects: `$` becomes `root` and `@` becomes `item`. Omit `item` and `@` stays unbound at the root, so reading `@.x` throws where there is no current item. Either way, `{{#each}}` still re-points `@` to the current item inside its body.
+The anchors `$` (root) and `@` (current `{{#each}}` item) work as [described below](#syntax) with no extra arguments. At the root, before any loop, both point at `values`. If you're embedding sjabloon under an engine with its own scope model, pass `{ root, item }` as the second argument to seed the two root anchors from distinct objects: `$` becomes `root` and `@` becomes `item`. Omit `item` and `@` stays unbound at the root, so reading `@.x` throws where there is no current item. Either way, `{{#each}}` still re-points `@` to the current item inside its body.
 
 ```js
-const tpl = template("{{ $.report }} — {{ @.row }}");
+const tpl = template("{{ $.report }} / {{ @.row }}");
 tpl(base, { root: reportRoot, item: currentRow }); // $ = reportRoot, @ = currentRow
 tpl(base, { root: reportRoot }); // no item → @.x throws
 ```
@@ -83,9 +93,9 @@ tpl.functions; // => ['fmt']
 
 Shorthand for `template(str, functions)(values)`, returning whatever its edition renders.
 
-### `text(tokens)` — root entry only
+### `text(tokens)` (root entry only)
 
-Joins a token stream the way `sjabloon/text` would have rendered it: literals verbatim, values as `String(value ?? '')`. `text(template(str)(values))` and `sjabloon/text`'s `template(str)(values)` are equal for every template and every set of values — a property the test suite and the fuzzer both check.
+Joins a token stream the way `sjabloon/text` would have rendered it: literals verbatim, values as `String(value ?? '')`. `text(template(str)(values))` and `sjabloon/text`'s `template(str)(values)` are equal for every template and every set of values. The test suite and the fuzzer both check that.
 
 ```js
 import { template, text } from "sjabloon";
@@ -98,9 +108,9 @@ text(tokens); // => '2 × Koffie'
 
 A `Token` is either `{ literal: string }` or `{ value: unknown }`:
 
-- **Values are pre-stringify.** `{{ total }}` holding `1000` yields the number `1000`, not `"1000"`, and nullish stays nullish. Stringification is deferred to `text()` — so a value with no primitive conversion reaches the stream intact and only fails when something asks for text.
-- **Order is render order.** Loop bodies append once per iteration, untaken branches append nothing, and block expressions (`#if` conditions, `#each` collections) never appear — they steer the render rather than being part of it.
-- **Literals are the template's static runs**, one token each, never merged and never empty. So the interleaving tells you the shape: a bare `{{ amount }}` is exactly one value token, while `Total: {{ amount }}` is a literal followed by a value. That distinction is why the engine emits tokens instead of a string plus a list of values — a spreadsheet cell that is _only_ a number is a different thing from one that happens to contain one.
+- **Values are pre-stringify.** `{{ total }}` holding `1000` yields the number `1000`, not `"1000"`, and nullish stays nullish. Stringification is deferred to `text()`, so a value with no primitive conversion reaches the stream intact and only fails when something asks for text.
+- **Order is render order.** Loop bodies append once per iteration, untaken branches append nothing, and block expressions (`#if` conditions, `#each` collections) never appear. They steer the render; they are not part of the stream.
+- **Literals are the template's static runs**, one token each, never merged and never empty. The interleaving tells you the shape: a bare `{{ amount }}` is exactly one value token, while `Total: {{ amount }}` is a literal followed by a value. That is why the engine emits tokens instead of a string plus a list of values. A spreadsheet cell that is _only_ a number is a different thing from one that happens to contain one.
 
 Literal tokens are frozen and shared across loop iterations; value tokens are fresh per emit.
 
@@ -123,7 +133,7 @@ Use `isDiagnostic(error)` when a host needs to distinguish those errors. It retu
 
 | Tag                                                   | Meaning                                                                                                   |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `{{ expr }}`                                          | Interpolate an expression — a value token, or text escaped per edition                                    |
+| `{{ expr }}`                                          | Interpolate an expression: a value token, or text escaped per edition                                     |
 | `{{{ expr }}}`                                        | Interpolate raw. **`sjabloon/html` only**; a `SyntaxError` elsewhere                                      |
 | `{{#if expr}} … {{#elif expr}} … {{#else}} … {{/if}}` | Conditional block, with as many `{{#elif}}` links as you need                                             |
 | `{{#each expr as item}} … {{/each}}`                  | Loop over an array or an object's values                                                                  |
@@ -173,7 +183,18 @@ That runtime CSP support costs some render speed. Handlebars and tempura generat
 
 Node.js 22.12 and newer, ESM only. Browser use is supported through a standards-based ESM bundler in environments supporting ES2024. Direct `<script>` globals, UMD, and CommonJS builds are not provided.
 
-Shipping CommonJS alongside ESM would put two copies of the core in any process that mixed `require` and `import`, and therefore two diagnostic identities — `isDiagnostic` would silently return `false` across the seam. One format removes that failure mode instead of documenting it.
+Shipping CommonJS alongside ESM would put two copies of the core in any process that mixed `require` and `import`. Each copy would have its own diagnostic identity, so `isDiagnostic` would return `false` across the seam.
+
+## Contributing
+
+```bash
+git clone https://github.com/getquario/sjabloon.git
+cd sjabloon
+npm install
+npm run check
+```
+
+`npm run check` is the local gate. Conventions for this repo live in [AGENTS.md](AGENTS.md).
 
 ## License
 
