@@ -3,6 +3,7 @@ import { FuzzedDataProvider } from "@jazzer.js/core";
 import { isDiagnostic, template } from "../lib/html.js";
 import { template as rootTemplate, text as joinTokens } from "../lib/index.js";
 import { template as textTemplate } from "../lib/text.js";
+import { isCompileErr, isRenderErr } from "./lib.js";
 
 // The two editions without a raw form, picked from bytes read after every
 // other consume so the committed corpus keeps its meaning.
@@ -184,12 +185,6 @@ function buildValues(data, names) {
   }
   return vals;
 }
-
-const isCompileErr = (e) => e instanceof SyntaxError;
-const isRenderErr = (e) =>
-  e instanceof SyntaxError ||
-  e instanceof TypeError ||
-  (e instanceof RangeError && /stack|Maximum call/i.test(String(e.message)));
 
 function diagnostic(e, src) {
   if (!isDiagnostic(e)) throw new Error("unauthenticated template diagnostic");
