@@ -5,6 +5,7 @@ import {
   type SjabloonBlock,
   type SjabloonDiagnostic,
   type SjabloonErrorCode,
+  type SjabloonRead,
   type Token,
 } from "../lib/index.js";
 import { template as htmlTemplate } from "../lib/html.js";
@@ -14,6 +15,7 @@ const render = template("{{ user.name }}");
 const tokens: Token[] = render({ user: { name: "Robin" } });
 const joined: string = text(tokens);
 const names: string[] = render.names;
+const reads: SjabloonRead[] = render.reads;
 const functions: string[] = render.functions;
 
 const markup: string = htmlTemplate("{{ x }}")({ x: 1 });
@@ -57,6 +59,7 @@ try {
 void [
   joined,
   names,
+  reads,
   functions,
   markup,
   bare,

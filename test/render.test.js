@@ -335,6 +335,48 @@ test("{ bound } keeps host names out of names without unbinding them", () => {
   assert.deepStrictEqual(template("{{ a }}", undefined, {}).names, ["a"], "bound is optional");
 });
 
+test("reads locate every root read in template coordinates", () => {
+  assert.deepStrictEqual(template("{{ a }} and {{ b.c }}").reads, [
+    { name: "a", start: 3, end: 4 },
+    { name: "b", start: 15, end: 16 },
+  ]);
+  assert.deepStrictEqual(
+    template("{{ a + a }}").reads,
+    [
+      { name: "a", start: 3, end: 4 },
+      { name: "a", start: 7, end: 8 },
+    ],
+    "every occurrence, in source order — names is the deduplicated view",
+  );
+  assert.deepStrictEqual(
+    template("{{ $.a }}{{#each xs as x}}{{ x.b }}{{/each}}").reads,
+    [
+      { name: "$", start: 3, end: 4 },
+      { name: "xs", start: 17, end: 19 },
+      { name: "x", start: 29, end: 30 },
+    ],
+    "anchors and loop variables are reads too — names omits them, reads points at them",
+  );
+  assert.deepStrictEqual(
+    template("{{#if n }}x{{/if}}").reads,
+    [{ name: "n", start: 6, end: 7 }],
+    "a block expression's reads land at its body offset",
+  );
+  assert.deepStrictEqual(
+    template("{{  a }}").reads,
+    [{ name: "a", start: 4, end: 5 }],
+    "leading tag whitespace stays counted",
+  );
+  const tpl = template("{{ run.total }}", undefined, { bound: ["run"] });
+  assert.deepStrictEqual(tpl.names, [], "bound leaves names");
+  assert.deepStrictEqual(
+    tpl.reads,
+    [{ name: "run", start: 3, end: 6 }],
+    "a bound read is still a read",
+  );
+  assert.deepStrictEqual(template("static only").reads, []);
+});
+
 test("scoped renders over a scope that already carries the anchors", () => {
   const root = { title: "T" };
   const scope = Object.create(null);

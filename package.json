@@ -61,7 +61,7 @@
     "test:unit": "c8 --100 --src lib/ node --disallow-code-generation-from-strings --test --test-concurrency=1 test/*.test.js"
   },
   "dependencies": {
-    "xprsn": "^0.10.0"
+    "xprsn": "^0.11.0"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.3",
@@ -85,7 +85,7 @@
       "ignore": [
         "xprsn"
       ],
-      "limit": "2.25 kB"
+      "limit": "2.3 kB"
     },
     {
       "name": "sjabloon/text",
@@ -93,7 +93,7 @@
       "ignore": [
         "xprsn"
       ],
-      "limit": "2.25 kB"
+      "limit": "2.3 kB"
     },
     {
       "name": "sjabloon/html",
@@ -101,7 +101,7 @@
       "ignore": [
         "xprsn"
       ],
-      "limit": "2.3 kB"
+      "limit": "2.35 kB"
     }
   ],
   "engines": {

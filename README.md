@@ -95,6 +95,13 @@ tpl.functions; // => ['fmt']
 template("{{ run.total }} of {{ count }}", undefined, { bound: ["run"] }).names; // => ['count']
 ```
 
+The renderer also carries `reads`: every root-name read with its span in the template source, in source order. Duplicates, anchors, loop variables and bound names are all kept — `names` is the free, deduplicated view. This is what an editor squiggles, hovers, and jumps from:
+
+```js
+template("{{ title }}: {{ total }}").reads;
+// => [{ name: 'title', start: 3, end: 8 }, { name: 'total', start: 16, end: 21 }]
+```
+
 The renderer also carries its own `isDiagnostic(error)`: `true` only for runtime diagnostics thrown through this renderer, where the module-wide [`isDiagnostic`](#diagnostics) answers for every template. An embedder holding many compiled templates asks the one that just rendered, so a diagnostic that leaked from an unrelated template is not mistaken for this cell's.
 
 ### `renderer.scoped(values)`

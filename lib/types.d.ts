@@ -1,4 +1,4 @@
-import type { XprsnErrorCode } from "xprsn";
+import type { XprsnErrorCode, XprsnRead } from "xprsn";
 
 export type SjabloonErrorCode =
   | XprsnErrorCode
@@ -24,6 +24,13 @@ export interface SjabloonDiagnostic extends Error {
 }
 
 export type SjabloonValues = Record<string, any>;
+
+/**
+ * One root-name read, with its span in the template source — xprsn's read
+ * record, forwarded with only its coordinates shifted.
+ */
+export type SjabloonRead = XprsnRead;
+
 export type SjabloonFunctions = Record<string, Function>;
 
 /**
@@ -50,8 +57,11 @@ export interface SjabloonScope {
  *
  * `names` are the variables the template reads from your values, deduplicated;
  * loop variables the template introduces are not included, and neither is
- * anything the compile's `bound` option declared. `functions` are the registry
- * functions the template calls, deduplicated.
+ * anything the compile's `bound` option declared. `reads` are every root-name
+ * read with its span in the template source, in source order — duplicates,
+ * anchors, loop variables and bound names kept, so `names` is its free,
+ * deduplicated view. `functions` are the registry functions the template
+ * calls, deduplicated.
  *
  * `isDiagnostic(error)` recognizes runtime diagnostics thrown through this
  * renderer alone — the per-renderer twin of the module-wide `isDiagnostic`.
@@ -65,6 +75,7 @@ export interface SjabloonScope {
 export interface SjabloonRenderer<T> {
   (values?: SjabloonValues, scope?: SjabloonScope): T;
   names: string[];
+  reads: SjabloonRead[];
   functions: string[];
   isDiagnostic(error: unknown): boolean;
   scoped(values: SjabloonValues): T;
