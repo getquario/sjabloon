@@ -300,24 +300,24 @@ test("compiled renderer remains reusable after a runtime diagnostic", () => {
   assert.equal(f({ item: { value: "ok" } }), "ok");
 });
 
-test("provenance survives later WeakSet prototype replacement", () => {
+test("provenance survives later WeakMap prototype replacement", () => {
   // Captured to restore in `finally`, never called — `unbound-method` reads the
   // saving of a prototype method as the scoping hazard of calling one.
   // oxlint-disable-next-line typescript/unbound-method
-  const add = WeakSet.prototype.add;
+  const set = WeakMap.prototype.set;
   // oxlint-disable-next-line typescript/unbound-method
-  const has = WeakSet.prototype.has;
+  const has = WeakMap.prototype.has;
   try {
-    WeakSet.prototype.add = () => {
-      throw Error("replaced add");
+    WeakMap.prototype.set = () => {
+      throw Error("replaced set");
     };
-    WeakSet.prototype.has = () => true;
+    WeakMap.prototype.has = () => true;
     const e = caught(() => template("{{ 1 + }}"));
     assert.equal(isDiagnostic(e), true);
     assert.equal(isDiagnostic(Error("spoof")), false);
   } finally {
-    WeakSet.prototype.add = add;
-    WeakSet.prototype.has = has;
+    WeakMap.prototype.set = set;
+    WeakMap.prototype.has = has;
   }
 });
 
@@ -347,6 +347,50 @@ test("runaway elif chains stay a typed SyntaxError through the depth budget", ()
   assert.strictEqual(e.code, "SJABLOON_TOO_DEEP");
   assert.strictEqual(e.blocks.length, 1, "elif links do not pollute block context");
   assert.ok(isDiagnostic(e), "authenticated as a sjabloon diagnostic");
+});
+
+test("a renderer recognizes its own runtime diagnostics alone", () => {
+  const mine = template("{{ item.value }}");
+  const other = template("{{ item.value }}");
+  const e = caught(() => mine({ item: null }));
+  assert.equal(mine.isDiagnostic(e), true, "the thrower owns it");
+  assert.equal(other.isDiagnostic(e), false, "an identical template does not");
+  assert.equal(isDiagnostic(e), true, "the module-wide check still holds");
+  assert.equal(mine.isDiagnostic(SyntaxError("spoof")), false);
+  assert.equal(mine.isDiagnostic(null), false);
+});
+
+test("a host error thrown by a registry function stays foreign", () => {
+  const boom = new Error("host");
+  const f = template("{{ f() }}", {
+    f: () => {
+      throw boom;
+    },
+  });
+  const e = caught(() => f());
+  assert.equal(e, boom, "rethrown untouched");
+  assert.equal(f.isDiagnostic(e), false);
+  assert.equal(isDiagnostic(e), false);
+});
+
+test("scoped renders throw the same located diagnostics", () => {
+  const src = "{{ item.value }}";
+  const f = template(src);
+  const e = caught(() => f.scoped(Object.assign(Object.create(null), { item: null })));
+  check(e, "XPRSN_NULL_BASE", src.indexOf("value"), src.indexOf("value") + 5);
+  assert.equal(f.isDiagnostic(e), true, "owned by the renderer that threw it");
+});
+
+test("relocate keeps the owning renderer's recognition", () => {
+  const f = template("{{ item.value }}");
+  const other = template("{{ item.value }}");
+  const moved = relocate(
+    caught(() => f({ item: null })),
+    { prefix: "cell: ", offset: 2 },
+  );
+  assert.equal(f.isDiagnostic(moved), true, "the copy answers to the thrower");
+  assert.equal(other.isDiagnostic(moved), false, "and to nobody else");
+  assert.equal(isXprsnDiagnostic(moved), true, "xprsn provenance survives too");
 });
 
 test("relocate returns an authenticated copy in the embedder's coordinates", () => {

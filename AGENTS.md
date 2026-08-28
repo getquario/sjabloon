@@ -12,7 +12,7 @@ A recursive parser turns blocks into closures. Every expression goes through `co
 
 Nodes are `(scope, acc) => void`. They append into one accumulator the root wrapper creates per render. `run()` is profile-blind; only the three node builders differ per edition.
 
-`make(profile)` binds the parser to `[lit, val, raw, seed, take]`, a positional tuple because oxc does not mangle property names. `raw` is `0` in editions that reject `{{{ }}}`. The profile is read only while parsing and baked into node closures. Parser state stays module-level in `core.js`, which keeps the diagnostics WeakSet a single shared instance.
+`make(profile)` binds the parser to `[lit, val, raw, seed, take]`, a positional tuple because oxc does not mangle property names. `raw` is `0` in editions that reject `{{{ }}}`. The profile is read only while parsing and baked into node closures. Parser state stays module-level in `core.js`, which keeps the diagnostics store a single shared instance.
 
 Three entries importing one `./core.js` is what makes `isDiagnostic` work across editions. `test/browser/browser.js` asserts `isDiagnostic === htmlIsDiagnostic` after loading two entries over HTTP.
 
@@ -25,7 +25,7 @@ Three entries importing one `./core.js` is what makes `isDiagnostic` work across
 - Compose closures that already exist in the shipped source. Source-scan tests grep `lib/` for `\beval\b`, `Function(`, and `new Function`, so comments in `lib/` have to avoid those spellings. The suite runs under `--disallow-code-generation-from-strings`.
 - Escaping lives in `lib/html.js`. That edition HTML-escapes `{{ }}` (`& < > " '`); raw output is explicit `{{{ }}}`. The other two editions escape nothing. Do not let `esc` drift into `core.js`.
 - Every expression goes through xprsn's `compile`. The `get()` guard stays single-sourced there.
-- `isDiagnostic` is a WeakSet. A forged `code`/`start`/`end`/`blocks` must not authenticate; a `Symbol.for` brand is not an acceptable trade.
+- `isDiagnostic` is a WeakMap keyed by identity (error -> the owning compile's `names` set, which each renderer's own `isDiagnostic` compares against). A forged `code`/`start`/`end`/`blocks` must not authenticate; a `Symbol.for` brand is not an acceptable trade.
 
 Size is a soft goal (budgets in `package.json`, `xprsn` ignored so the number is sjabloon's own code). Name bindings for readers; a consumer minifier mangles them anyway, and `lib/` ships verbatim so those names show up in stack traces. Property names do not mangle: the accumulator's `.text` is worth its bytes. Keep escaping, the guard, and the passing test; then check `npm run size`.
 
@@ -36,7 +36,7 @@ Size is a soft goal (budgets in `package.json`, `xprsn` ignored so the number is
 - `null`/`undefined` interpolate as empty strings in the string editions. The token edition carries them through; `text()` applies the same `?? ''`.
 - Malformed or unclosed tags and bad expressions throw `SyntaxError` at compile time. Runtime `TypeError` comes from xprsn. `{{{ }}}` outside `sjabloon/html` is `SJABLOON_RAW_TAG`, rejected in the parser, not the lexer: the lexer must still tokenize `}}}` in every edition or the `triple` latch (and its linearity) is lost.
 - Loop variables shadow outer names. `#each` walks `[value, key]` pairs (array indexes or own object keys). Nullish or non-iterable collections iterate zero times; an empty collection renders `{{#else}}` in parent scope if present.
-- `$` is root values, `@` is the current `#each` item (root outside any loop). Both are pre-seeded into `bound`, so they never appear in `names`. The renderer takes an optional `{ root, item }` that overrides the anchors without mutating the caller's object. Omitting `item` (`'item' in o`) leaves `@` unbound, so `@.x` throws; the default (no second arg) keeps `$` = `@` = values.
+- `$` is root values, `@` is the current `#each` item (root outside any loop). Both are pre-seeded into `bound`, so they never appear in `names`; `template`'s `opts.bound` appends the embedder's own names to the same list. The renderer takes an optional `{ root, item }` that overrides the anchors without mutating the caller's object. Omitting `item` (`'item' in o`) leaves `@` unbound, so `@.x` throws; the default (no second arg) keeps `$` = `@` = values. `renderer.scoped(values)` skips the wrapper entirely and trusts the caller's chain to bind the anchors. `renderer.isDiagnostic` recognizes runtime diagnostics thrown through that renderer alone; `relocate` preserves the owner.
 - Token stream: `{ literal: string } | { value: unknown }`. One literal token per static text run, never merged, never empty. Literal tokens are hoisted and frozen at compile time (reference-identical across iterations); value tokens are fresh per emit. Block expressions never appear in the stream. The accumulator is local to the render call, so re-entrancy is free.
 - `text(root(v))` must equal `textEntry(v)` for every template and values (unit property and the render fuzzer's oracle). The token edition defers stringification, so values the string editions cannot convert fail at `text()`; the invariant is about the join.
 - Inside `#each`, `loop` = `{ index` (1-based), `index0`, `first`, `last`, `length }` on the child scope, bound like the loop variables.
@@ -52,7 +52,7 @@ Omakase: one obvious path over knobs. Test the guarantee a user relies on. Add c
 - Bindings named for readers (`scope`, `acc`, `compileExpr`, `tokens`). Rename with a scope-aware tool: a bare `v` or `o` also lives in unrelated closures, and `{ x }` shorthand renames the property.
 - Tests are `node:test` in `test/*.test.js`, run against `lib/`. Shared template meaning lives in `render.test.js` (via `sjabloon/text`). Where the three editions actually differ lives in `editions.test.js`. Token-stream shape lives in `tokens.test.js`. Diagnostics in `errors`, CSP and guards in `safety`. New shared behaviour belongs in `render.test.js`. New syntax or a new guard also belongs in `fuzz/structured.fuzz.js`.
 - Treat the language as original. Leave Symfony unmentioned in code, comments, and docs.
-- ESM only. Two module formats would split the diagnostics WeakSet across a `require` / `import` seam.
+- ESM only. Two module formats would split the diagnostics store across a `require` / `import` seam.
 - Conventional Commits, at most 80 characters.
 - Declarations are hand-written in `lib/` (`types.d.ts` shared; each entry re-exports it and declares only its `template`/`render` return). Hang prose on the shared types, not on each `template`. Generating them fails three ways: `isolatedDeclarations` rejects `export const { template, render } = make(...)`; plain emit resolves JSDoc-typedef-only modules to `undefined` and exits 0; `stripInternal` does not strip JSDoc `@typedef`, so `Tok` and `Node` would ship as API. `checkJs` under `strict` keeps the pair honest: `fault()` takes `SjabloonErrorCode`, so a thrown code `types.d.ts` omits fails `npm run test:types`.
 - `translated` is `const` with `@type {(…) => never}` so its catch block is terminal.

@@ -49,13 +49,25 @@ export interface SjabloonScope {
  * A compiled template: render it many times.
  *
  * `names` are the variables the template reads from your values, deduplicated;
- * loop variables the template introduces are not included. `functions` are the
- * registry functions the template calls, deduplicated.
+ * loop variables the template introduces are not included, and neither is
+ * anything the compile's `bound` option declared. `functions` are the registry
+ * functions the template calls, deduplicated.
+ *
+ * `isDiagnostic(error)` recognizes runtime diagnostics thrown through this
+ * renderer alone — the per-renderer twin of the module-wide `isDiagnostic`.
+ *
+ * `scoped(values)` renders over a scope chain that already binds the anchors:
+ * no wrapper scope is created, `$` and `@` resolve from `values` itself, and a
+ * chain that omits `@` leaves it unbound so `@.x` throws through xprsn's
+ * guard. The zero-allocation seam for an embedder rendering over scopes it
+ * already builds; `{{#each}}` still re-points `@` inside its body.
  */
 export interface SjabloonRenderer<T> {
   (values?: SjabloonValues, scope?: SjabloonScope): T;
   names: string[];
   functions: string[];
+  isDiagnostic(error: unknown): boolean;
+  scoped(values: SjabloonValues): T;
 }
 
 /** One static text run of the template, verbatim. */

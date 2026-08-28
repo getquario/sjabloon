@@ -314,6 +314,61 @@ test("names", () => {
   assert.deepStrictEqual(template("static only").names, []);
 });
 
+test("{ bound } keeps host names out of names without unbinding them", () => {
+  const tpl = template("{{ run.total }}/{{ x }}", undefined, { bound: ["run"] });
+  assert.deepStrictEqual(tpl.names, ["x"], "a bound name is not reported");
+  assert.strictEqual(tpl({ run: { total: 5 }, x: "a" }), "5/a", "it still resolves normally");
+  assert.deepStrictEqual(
+    template("{{ page.number }}{{#each xs as x}}{{ x }}{{ group.key }}{{/each}}", undefined, {
+      bound: new Set(["page", "group"]),
+    }).names,
+    ["xs"],
+    "any iterable works, inside and outside loops",
+  );
+  assert.deepStrictEqual(
+    template("{{#each xs as page}}{{ page }}{{/each}}{{ page }}", undefined, {
+      bound: ["page"],
+    }).names,
+    ["xs"],
+    "a loop variable may shadow a bound name",
+  );
+  assert.deepStrictEqual(template("{{ a }}", undefined, {}).names, ["a"], "bound is optional");
+});
+
+test("scoped renders over a scope that already carries the anchors", () => {
+  const root = { title: "T" };
+  const scope = Object.create(null);
+  scope["$"] = root;
+  scope.plain = "p";
+  assert.strictEqual(
+    template("{{ $.title }}/{{ plain }}").scoped(scope),
+    "T/p",
+    "$ and free names resolve from the scope chain itself",
+  );
+  const row = Object.create(scope);
+  row["@"] = { n: 1 };
+  assert.strictEqual(
+    template("{{ $.title }}:{{ @.n }}").scoped(row),
+    "T:1",
+    "@ resolves from the chain where the embedder bound it",
+  );
+  assert.throws(
+    () => template("{{ @.x }}").scoped(scope),
+    TypeError,
+    "a scope without @ leaves it unbound, so @.x throws",
+  );
+  assert.strictEqual(
+    template("{{#each $.rows as r}}{{ @.n }};{{/each}}").scoped(
+      Object.assign(Object.create(null), { $: { rows: [{ n: 1 }, { n: 2 }] } }),
+    ),
+    "1;2;",
+    "#each still re-points @ inside its body",
+  );
+  template("{{ plain }}{{#each $.rows as r}}{{ r }}{{/each}}").scoped(scope);
+  assert.deepStrictEqual(root, { title: "T" }, "the caller's objects come back unchanged");
+  assert.ok(!("@" in scope), "scoped never writes an anchor onto the scope");
+});
+
 test("functions", () => {
   const fns = { fmt: (n) => n, sum: (xs) => xs, upper: (s) => s };
   assert.deepStrictEqual(template("{{ fmt(price) }}", fns).functions, ["fmt"]);

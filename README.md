@@ -67,7 +67,7 @@ Every edition exports `template`, `render`, `isDiagnostic`, and `relocate`. They
 
 ## API
 
-### `template(str, functions?)`
+### `template(str, functions?, options?)`
 
 Compiles the template and returns a renderer. What it renders to depends on the edition you imported from (see [Editions](#editions)); everything else on this page is identical across all three. Malformed tags, unclosed blocks, and invalid expressions throw a `SyntaxError` at compile time.
 
@@ -87,6 +87,24 @@ const tpl = template("{{ fmt(title) }}{{#each items as it}}{{ it.name }}{{/each}
 });
 tpl.names; // => ['title', 'items']
 tpl.functions; // => ['fmt']
+```
+
+`options.bound` lists names your engine already has in scope — a loop variable, a handle, a `page` anchor. They are excluded from `names` and still resolve normally at render time, the same contract as xprsn's own `bound`:
+
+```js
+template("{{ run.total }} of {{ count }}", undefined, { bound: ["run"] }).names; // => ['count']
+```
+
+The renderer also carries its own `isDiagnostic(error)`: `true` only for runtime diagnostics thrown through this renderer, where the module-wide [`isDiagnostic`](#diagnostics) answers for every template. An embedder holding many compiled templates asks the one that just rendered, so a diagnostic that leaked from an unrelated template is not mistaken for this cell's.
+
+### `renderer.scoped(values)`
+
+The trusted-scope render, for an embedder whose scope chain already binds the anchors. The default call wraps `values` in a fresh scope and seeds `$` and `@` into it; `scoped` skips the wrapper: `$` and `@` resolve from `values` itself, and a chain that omits `@` leaves it unbound so `@.x` throws where there is no current item. `{{#each}}` still re-points `@` inside its body, and nothing is ever written to your objects. Rendering one template per cell per row over scopes you already build, this is the path with zero per-call allocations beyond the output.
+
+```js
+const row = Object.create(base); // base binds $ once per render
+row["@"] = item;
+tpl.scoped(row);
 ```
 
 ### `render(str, values?, functions?)`
