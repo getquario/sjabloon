@@ -81,3 +81,16 @@ export type Token = LiteralToken | ValueToken;
  * through all of them.
  */
 export function isDiagnostic(error: unknown): error is SjabloonDiagnostic;
+
+/**
+ * Copy a diagnostic into an embedder's coordinates: `prefix` is prepended to
+ * the message verbatim, `offset` shifts the span, every other field — the
+ * frozen `blocks` context included — is carried over, and the copy is
+ * authenticated exactly as the original was.
+ *
+ * @throws {TypeError} When `diag` is not a sjabloon diagnostic.
+ */
+export function relocate(
+  diag: unknown,
+  opts?: { prefix?: string; offset?: number },
+): SjabloonDiagnostic;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { compile } from "xprsn";
-import { isDiagnostic, template } from "../lib/html.js";
+import { compile, isDiagnostic as isXprsnDiagnostic } from "xprsn";
+import { isDiagnostic, relocate, template } from "../lib/html.js";
 
 let caught = (fn) => {
   try {
@@ -347,4 +347,109 @@ test("runaway elif chains stay a typed SyntaxError through the depth budget", ()
   assert.strictEqual(e.code, "SJABLOON_TOO_DEEP");
   assert.strictEqual(e.blocks.length, 1, "elif links do not pollute block context");
   assert.ok(isDiagnostic(e), "authenticated as a sjabloon diagnostic");
+});
+
+test("relocate returns an authenticated copy in the embedder's coordinates", () => {
+  const src = "{{#if 1 +}}x{{/if}}";
+  const original = caught(() => template(src));
+
+  const moved = relocate(original, { prefix: "cell.value: ", offset: 3 });
+
+  check(moved, original.code, original.start + 3, original.end + 3, original.blocks);
+  assert.equal(moved.message, "cell.value: " + original.message);
+  assert.notEqual(moved, original);
+  assert.equal(original.start, src.indexOf("}}"), "the original is left untouched");
+});
+
+test("relocate carries the block context across, still immutable", () => {
+  const original = caught(() => template("{{#if 1 +}}x{{/if}}"));
+  const moved = relocate(original, { offset: 1 });
+
+  assert.deepStrictEqual(moved.blocks, original.blocks);
+  assert.equal(moved.blocks, original.blocks, "the same frozen context, not a copy");
+  assert.throws(() => {
+    moved.blocks = [];
+  }, TypeError);
+});
+
+test("relocate defaults to no prefix and no shift", () => {
+  const original = caught(() => template("{{ 1 + }}"));
+  const moved = relocate(original);
+
+  check(moved, original.code, original.start, original.end, original.blocks);
+  assert.equal(moved.message, original.message);
+});
+
+test("relocate keeps the constructor of a runtime diagnostic", () => {
+  const original = caught(() => template("{{ item.value }}")({ item: null }));
+  const moved = relocate(original, { prefix: "detail: ", offset: 2 });
+
+  assert.ok(moved instanceof TypeError);
+  check(moved, original.code, original.start + 2, original.end + 2, original.blocks);
+});
+
+test("relocate refuses anything that is not a sjabloon diagnostic", () => {
+  const spoof = Object.assign(SyntaxError("spoof"), {
+    code: "SJABLOON_UNEXPECTED_TAG",
+    start: 0,
+    end: 1,
+  });
+  for (const value of [
+    null,
+    undefined,
+    1,
+    "SJABLOON_UNEXPECTED_TAG",
+    {},
+    SyntaxError("host"),
+    spoof,
+  ])
+    assert.throws(() => relocate(value), TypeError);
+});
+
+test("relocate does not mint a diagnostic through a replaced constructor", () => {
+  const d = caught(() => template("{{ 1 + }}"));
+  const real = SyntaxError.prototype.constructor;
+  try {
+    SyntaxError.prototype.constructor = function () {
+      return { pwned: true };
+    };
+    const moved = relocate(d, { prefix: "x: " });
+    assert.ok(moved instanceof SyntaxError, "the class comes from a captured table");
+    assert.ok(!Object.hasOwn(moved, "pwned"));
+    assert.equal(isDiagnostic(moved), true);
+  } finally {
+    SyntaxError.prototype.constructor = real;
+  }
+});
+
+test("relocate keeps a translated diagnostic authentic to xprsn as well", () => {
+  // An expression fault is registered in both stores, so its copy must be too:
+  // an embedder that asks xprsn about a relocated error gets the same answer it
+  // got about the original.
+  const original = caught(() => template("{{ 1 + }}"));
+  assert.equal(isXprsnDiagnostic(original), true, "the premise");
+
+  const moved = relocate(original, { prefix: "cell: ", offset: 2 });
+  assert.equal(isXprsnDiagnostic(moved), true);
+  assert.equal(isDiagnostic(moved), true);
+  assert.equal(moved.start, original.start + 2);
+
+  // A fault sjabloon raised itself belongs to sjabloon alone, before and after.
+  const native = caught(() => template("{{#each rows as row}}"));
+  assert.equal(isXprsnDiagnostic(native), false, "the premise");
+  const movedNative = relocate(native, { offset: 2 });
+  assert.equal(isXprsnDiagnostic(movedNative), false);
+  assert.equal(isDiagnostic(movedNative), true);
+});
+
+test("relocate degrades to a plain Error when the original's prototype was replaced", () => {
+  // A native sjabloon fault, so the copy's class comes from the captured
+  // table rather than from the xprsn branch.
+  const d = caught(() => template("{{#each rows as row}}"));
+  Object.setPrototypeOf(d, Object.create(null));
+
+  const moved = relocate(d, { prefix: "x: " });
+  assert.ok(moved instanceof Error, "an unrecognized class falls back to Error");
+  assert.ok(!(moved instanceof SyntaxError));
+  assert.equal(isDiagnostic(moved), true, "and is still authenticated");
 });

@@ -63,7 +63,7 @@ Three entry points, one engine. They share a parser, a syntax, and a diagnostics
 
 `{{{ }}}` exists only in the HTML edition, where "raw" means something. Everywhere else `{{ }}` is already raw, so the triple form is a compile-time `SJABLOON_RAW_TAG` error.
 
-Every edition exports `template`, `render`, and `isDiagnostic`. They all resolve to one shared core, so a diagnostic thrown through any of them authenticates through all of them.
+Every edition exports `template`, `render`, `isDiagnostic`, and `relocate`. They all resolve to one shared core, so a diagnostic thrown through any of them authenticates through all of them.
 
 ## API
 
@@ -128,6 +128,23 @@ Parser codes are `SJABLOON_EACH_SYNTAX`, `SJABLOON_BLOCKED_BINDING`, `SJABLOON_U
 Unauthenticated errors thrown by registered functions, getters, methods, or value coercion hooks are host errors. Sjabloon passes them through unchanged and does not attach template diagnostic fields.
 
 Use `isDiagnostic(error)` when a host needs to distinguish those errors. It returns `true` only for errors produced or translated by the same sjabloon module instance. Copying a documented `code`, `start`, `end`, and `blocks` onto another error does not authenticate it. A diagnostic from another installed copy or module instance returns `false`. All three editions share one core, so mixing them in a single process is safe: an error thrown through `sjabloon/html` authenticates through `sjabloon`.
+
+#### Relocating a diagnostic
+
+An embedder that compiles templates out of a larger document — a cell in a report, a field in a form — reports the fault in its own coordinates, not the template's. `relocate(diagnostic, { prefix, offset })` returns the copy to re-throw:
+
+```js
+import { isDiagnostic, relocate, template } from "sjabloon";
+
+try {
+  template(cell.value);
+} catch (error) {
+  if (!isDiagnostic(error)) throw error;
+  throw relocate(error, { prefix: "detail.cells[0].value: " });
+}
+```
+
+The copy keeps the original's class, prepends `prefix` to the message verbatim, shifts `start` and `end` by `offset`, and carries every other field across by descriptor — including the frozen `blocks` context, which stays frozen and non-writable on the copy. `blocks` is the same array, so its openers' own `start`/`end` stay in template coordinates while the error's span moves. It is registered exactly as the original was, so it passes `isDiagnostic` — and an expression fault, which is an xprsn diagnostic sjabloon translated into template coordinates, is relocated by xprsn so the copy stays authentic to both packages just as the original is. The original is left untouched. Relocation belongs here rather than in the embedder because authentication is by identity: a copy an embedder builds itself cannot be authenticated, and a field added to a diagnostic here would be a field the embedder's copy silently drops. Passing anything but a sjabloon diagnostic throws a `TypeError`.
 
 ## Syntax
 
