@@ -22,6 +22,15 @@ export function render(str: string, values?: SjabloonValues, funcs?: SjabloonFun
 
 /**
  * Join a token stream into the string `sjabloon/text` would have produced:
- * literals verbatim, values as `String(value ?? '')`.
+ * literals verbatim, values through `display()`.
  */
 export function text(tokens: readonly Token[]): string;
+
+/**
+ * Display text for one interpolated value — the scalar rule `text()` and the
+ * string editions share. A valid `Date` renders as ISO 8601 UTC
+ * (`toISOString()`), deterministically across machines; an invalid `Date`
+ * stays `"Invalid Date"`; nullish displays empty; everything else is
+ * `String(value)`.
+ */
+export function display(value: unknown): string;

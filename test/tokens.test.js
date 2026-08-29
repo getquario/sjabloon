@@ -3,7 +3,7 @@
 // in editions.test.js.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { template, text } from "../lib/index.js";
+import { display, template, text } from "../lib/index.js";
 import { template as plain } from "../lib/text.js";
 
 const lit = (literal) => ({ literal });
@@ -121,11 +121,29 @@ test("literal tokens are frozen and shared across iterations", () => {
   assert.notStrictEqual(tokens[1], tokens[3], "value tokens are fresh per emit");
 });
 
-test('text() joins literals verbatim and values as String(value ?? "")', () => {
+test("text() joins literals verbatim and values through display()", () => {
   assert.strictEqual(text(template("a{{ x }}b")({ x: 1 })), "a1b");
   assert.strictEqual(text(template("{{ x }}")({ x: null })), "", "nullish joins as empty");
   assert.strictEqual(text(template("{{ x }}")({})), "", "missing joins as empty");
   assert.strictEqual(text([]), "");
+});
+
+test("a Date displays as ISO 8601 UTC, the same on every machine", () => {
+  const d = new Date("2026-01-02T00:30:00Z");
+  assert.strictEqual(display(d), "2026-01-02T00:30:00.000Z");
+  assert.strictEqual(
+    text(template("at {{ d }}")({ d })),
+    "at 2026-01-02T00:30:00.000Z",
+    "text() joins Dates through the same rule",
+  );
+  assert.strictEqual(
+    display(new Date(NaN)),
+    "Invalid Date",
+    "an invalid Date keeps its deterministic String form",
+  );
+  assert.strictEqual(display(null), "", "nullish displays empty");
+  assert.strictEqual(display(undefined), "");
+  assert.strictEqual(display(0), "0", "present falsy values still display");
 });
 
 // Found by the fuzzer: the token edition renders values the string editions

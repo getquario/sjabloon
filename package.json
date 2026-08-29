@@ -85,7 +85,7 @@
       "ignore": [
         "xprsn"
       ],
-      "limit": "2.3 kB"
+      "limit": "2.35 kB"
     },
     {
       "name": "sjabloon/text",
@@ -93,7 +93,7 @@
       "ignore": [
         "xprsn"
       ],
-      "limit": "2.3 kB"
+      "limit": "2.35 kB"
     },
     {
       "name": "sjabloon/html",
@@ -101,7 +101,7 @@
       "ignore": [
         "xprsn"
       ],
-      "limit": "2.35 kB"
+      "limit": "2.4 kB"
     }
   ],
   "engines": {

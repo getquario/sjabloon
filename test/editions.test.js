@@ -116,3 +116,19 @@ test("text(tokens) equals the plain-string render", () => {
     }
   }
 });
+
+test("every edition displays a Date as ISO 8601 UTC", () => {
+  const values = { d: new Date("2026-01-02T00:30:00Z") };
+  assert.strictEqual(plain.template("{{ d }}")(values), "2026-01-02T00:30:00.000Z");
+  assert.strictEqual(html.template("{{ d }}")(values), "2026-01-02T00:30:00.000Z");
+  assert.strictEqual(
+    html.template("{{{ d }}}")(values),
+    "2026-01-02T00:30:00.000Z",
+    "the raw form uses the same display rule",
+  );
+  assert.strictEqual(
+    root.text(root.template("{{ d }}")(values)),
+    "2026-01-02T00:30:00.000Z",
+    "the token join agrees with the string editions",
+  );
+});

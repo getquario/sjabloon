@@ -1,4 +1,5 @@
 import {
+  display,
   isDiagnostic,
   template,
   text,
@@ -14,6 +15,7 @@ import { template as textTemplate } from "../lib/text.js";
 const render = template("{{ user.name }}");
 const tokens: Token[] = render({ user: { name: "Robin" } });
 const joined: string = text(tokens);
+const displayed: string = display(new Date());
 const names: string[] = render.names;
 const reads: SjabloonRead[] = render.reads;
 const functions: string[] = render.functions;
@@ -58,6 +60,7 @@ try {
 
 void [
   joined,
+  displayed,
   names,
   reads,
   functions,

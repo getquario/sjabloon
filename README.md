@@ -120,7 +120,11 @@ Shorthand for `template(str, functions)(values)`, returning whatever its edition
 
 ### `text(tokens)` (root entry only)
 
-Joins a token stream the way `sjabloon/text` would have rendered it: literals verbatim, values as `String(value ?? '')`. `text(template(str)(values))` and `sjabloon/text`'s `template(str)(values)` are equal for every template and every set of values. The test suite and the fuzzer both check that.
+Joins a token stream the way `sjabloon/text` would have rendered it: literals verbatim, values through `display()`. `text(template(str)(values))` and `sjabloon/text`'s `template(str)(values)` are equal for every template and every set of values. The test suite and the fuzzer both check that.
+
+### `display(value)` (root entry only)
+
+The scalar display rule every edition and `text()` share, exported for embedders that stringify token values themselves. A valid `Date` renders as ISO 8601 UTC (`toISOString()`) — the same bytes on every machine, where `String(date)` would bake in the host's timezone and locale. An invalid `Date` keeps its deterministic `'Invalid Date'` form, nullish displays empty, and everything else is `String(value)`.
 
 ```js
 import { template, text } from "sjabloon";
