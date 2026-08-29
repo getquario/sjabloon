@@ -81,6 +81,25 @@ export interface SjabloonRenderer<T> {
   scoped(values: SjabloonValues): T;
 }
 
+/**
+ * `template` in every edition: compile once, render many times. `T` is what
+ * one render returns.
+ *
+ * @throws {SyntaxError} On malformed tags, unclosed blocks, or bad expressions.
+ */
+export type SjabloonTemplate<T> = (
+  str: string,
+  funcs?: SjabloonFunctions,
+  opts?: { bound?: Iterable<string> },
+) => SjabloonRenderer<T>;
+
+/** Compile and render in one go. Shorthand for `template(str, funcs)(values)`. */
+export type SjabloonRender<T> = (
+  str: string,
+  values?: SjabloonValues,
+  funcs?: SjabloonFunctions,
+) => T;
+
 /** One static text run of the template, verbatim. */
 export interface LiteralToken {
   literal: string;
