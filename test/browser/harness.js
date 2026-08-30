@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import http from "node:http";
 import { chromium } from "playwright";
 
-const importMap = '{"imports":{"xprsn":"/xprsn/index.js"}}';
+const importMap = '{"imports":{"waarmerk":"/waarmerk/index.js","xprsn":"/xprsn/index.js"}}';
 const hash = createHash("sha256").update(importMap).digest("base64");
 const csp = [
   "default-src 'none'",
@@ -64,6 +64,11 @@ const files = new Map([
   [
     "/xprsn/index.js",
     ["text/javascript; charset=utf-8", await readFile(new URL(import.meta.resolve("xprsn")))],
+  ],
+  // xprsn imports waarmerk by bare specifier too, and the map covers both.
+  [
+    "/waarmerk/index.js",
+    ["text/javascript; charset=utf-8", await readFile(new URL(import.meta.resolve("waarmerk")))],
   ],
 ]);
 

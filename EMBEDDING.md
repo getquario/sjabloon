@@ -139,7 +139,7 @@ try {
 ```
 
 The copy keeps the original's class, prepends `prefix` to the message verbatim,
-shifts `start` and `end` by `offset`, and carries every other field across by
+moves the span, and carries every other field across by
 descriptor — including the frozen `blocks` context, which stays frozen and
 non-writable on the copy. `blocks` is the same array, so its openers' own
 `start`/`end` stay in template coordinates while the error's span moves.
@@ -149,6 +149,19 @@ An expression fault is an xprsn diagnostic that sjabloon translated into templat
 coordinates; relocating it goes through xprsn, so the copy stays authentic to
 both packages just as the original is. The original is left untouched. Passing
 anything but a sjabloon diagnostic throws a `TypeError`.
+
+`offset` shifts the span, and it is right whenever the template was a verbatim
+slice of your text. It is wrong when your text was **decoded** first — a template
+read out of a JSON string literal, where an escape makes every later offset
+slide. There is no offset that fixes that, so name the region the template came
+from instead:
+
+```js
+throw relocate(error, { prefix: "cells[3].template: ", span: [16, 41] });
+```
+
+`span` replaces the span outright and wins if you pass both. Neither option adds
+a span to a diagnostic that had none.
 
 Relocation lives here rather than in the embedder because authentication is by
 identity: a copy an embedder builds itself cannot be authenticated, and a field

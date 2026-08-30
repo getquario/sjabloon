@@ -62,7 +62,8 @@
     "test:unit": "c8 --100 --src lib/ node --disallow-code-generation-from-strings --test --test-concurrency=1 test/*.test.js"
   },
   "dependencies": {
-    "xprsn": "^0.11.0"
+    "waarmerk": "^0.1.0",
+    "xprsn": "^0.11.1"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "^0.18.3",
@@ -84,6 +85,7 @@
       "name": "sjabloon",
       "path": "lib/index.js",
       "ignore": [
+        "waarmerk",
         "xprsn"
       ],
       "limit": "2.35 kB"
@@ -92,6 +94,7 @@
       "name": "sjabloon/text",
       "path": "lib/text.js",
       "ignore": [
+        "waarmerk",
         "xprsn"
       ],
       "limit": "2.35 kB"
@@ -100,6 +103,7 @@
       "name": "sjabloon/html",
       "path": "lib/html.js",
       "ignore": [
+        "waarmerk",
         "xprsn"
       ],
       "limit": "2.4 kB"

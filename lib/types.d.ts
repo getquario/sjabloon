@@ -1,7 +1,12 @@
+import type { Diagnostic, Relocation } from "waarmerk";
 import type { XprsnErrorCode, XprsnRead } from "xprsn";
 
+/**
+ * The codes sjabloon itself mints. An expression fault carries xprsn's instead,
+ * which is why the diagnostic's `code` is the wider union — the same split
+ * padvinder draws between its own codes and treffer's.
+ */
 export type SjabloonErrorCode =
-  | XprsnErrorCode
   | "SJABLOON_EACH_SYNTAX"
   | "SJABLOON_BLOCKED_BINDING"
   | "SJABLOON_UNEXPECTED_TAG"
@@ -16,8 +21,17 @@ export interface SjabloonBlock {
   readonly end: number;
 }
 
-export interface SjabloonDiagnostic extends Error {
-  readonly code: SjabloonErrorCode;
+/**
+ * The fields and their meanings are waarmerk's; this names the code union they are
+ * checked against, narrows the three this module always carries from optional
+ * to required, and adds the block context a template fault sits in.
+ *
+ * `code` is widened with `XprsnErrorCode` because most diagnostics here are
+ * xprsn errors translated into template coordinates: a host can still tell a
+ * malformed tag from a fault in the expression inside it.
+ */
+export interface SjabloonDiagnostic extends Diagnostic<SjabloonErrorCode | XprsnErrorCode> {
+  readonly code: SjabloonErrorCode | XprsnErrorCode;
   readonly start: number;
   readonly end: number;
   readonly blocks: readonly SjabloonBlock[];
@@ -132,7 +146,4 @@ export function isDiagnostic(error: unknown): error is SjabloonDiagnostic;
  *
  * @throws {TypeError} When `diag` is not a sjabloon diagnostic.
  */
-export function relocate(
-  diag: unknown,
-  opts?: { prefix?: string; offset?: number },
-): SjabloonDiagnostic;
+export function relocate(diag: unknown, opts?: Relocation): SjabloonDiagnostic;

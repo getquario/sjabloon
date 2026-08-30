@@ -1,3 +1,4 @@
+import type { XprsnErrorCode } from "xprsn";
 import {
   display,
   isDiagnostic,
@@ -43,7 +44,8 @@ try {
 } catch (error: unknown) {
   if (isDiagnostic(error)) {
     const diagnostic: SjabloonDiagnostic = error;
-    const code: SjabloonErrorCode = diagnostic.code;
+    // Widened by design: an expression fault carries xprsn's code.
+    const code: SjabloonErrorCode | XprsnErrorCode = diagnostic.code;
     const start: number = diagnostic.start;
     const end: number = diagnostic.end;
     const blocks: readonly SjabloonBlock[] = diagnostic.blocks;
