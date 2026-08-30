@@ -1,6 +1,6 @@
 # sjabloon
 
-A tiny, CSP-safe, target-neutral template engine for JavaScript. **~1.9KB min+brotli (~3.7KB with [xprsn](https://www.npmjs.com/package/xprsn)), one dependency.**
+A tiny, CSP-safe template engine for JavaScript. **~1.9KB min+brotli (~3.7KB with [xprsn](https://www.npmjs.com/package/xprsn)), one dependency.**
 
 [![NPM version](https://img.shields.io/npm/v/sjabloon.svg)](https://www.npmjs.com/package/sjabloon)
 [![Build Status](https://github.com/getquario/sjabloon/actions/workflows/test.yml/badge.svg)](https://github.com/getquario/sjabloon/actions/workflows/test.yml)
@@ -13,9 +13,24 @@ A tiny, CSP-safe, target-neutral template engine for JavaScript. **~1.9KB min+br
 	</picture>
 </a>
 
-_Sjabloon_ is Dutch for "template". It renders templates with full [xprsn](https://github.com/getquario/xprsn) expressions inside every tag, without turning template text into JavaScript. There is no `eval` and no `new Function`, so it runs under a strict Content Security Policy where engines that compile templates to code cannot.
+_Sjabloon_ is Dutch for "template". It renders familiar `{{ }}` templates — interpolation, `{{#if}}`, `{{#each}}` — with full [xprsn](https://github.com/getquario/xprsn) expressions inside every tag, and never turns template text into JavaScript. There is no `eval` and no `new Function`, so templates that arrive at runtime still render under a strict Content Security Policy, where engines that compile templates to code cannot.
 
-The engine emits **tokens**, not text. A render gives you the literal runs and the interpolated values, interleaved in render order. Different targets need different things from the same template: HTML wants escaped text, a spreadsheet wants the number `1000` and a cell format. Escaping belongs at the output edge, not in the engine, so a string is just one way to consume the stream.
+## Contents
+
+- [Install](#install)
+- [Usage](#usage)
+- [Is sjabloon the right tool?](#is-sjabloon-the-right-tool)
+- [Related packages](#related-packages)
+- [Editions](#editions)
+- [Syntax](#syntax)
+- [API](#api)
+- [The token stream](#the-token-stream)
+- [Safety](#safety)
+- [Content Security Policy](#content-security-policy)
+- [Environments](#environments)
+- [Embedding sjabloon](#embedding-sjabloon)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Install
 
@@ -23,23 +38,14 @@ The engine emits **tokens**, not text. A render gives you the literal runs and t
 npm install sjabloon
 ```
 
-Node.js 22.12 or newer, ESM only.
+Node.js 22.12 or newer, ESM only. TypeScript declarations ship with the package; nothing extra to install.
 
 ## Usage
 
-```js
-import { template, text } from "sjabloon";
-
-const cell = template("{{ total * 1.21 }}");
-
-cell({ total: 1000 }); // => [{ value: 1210 }]      // still a number
-text(cell({ total: 1000 })); // => '1210'                 // when you want the string
-```
-
-If you only want a string, import the edition that produces one directly:
+If you're rendering HTML, import the HTML edition. It escapes every interpolated value, and it is the edition most projects want:
 
 ```js
-import { render } from "sjabloon/html"; // {{ }} HTML-escapes, {{{ }}} is raw
+import { render } from "sjabloon/html";
 
 render(
   `<ul>{{#each items as it, i}}
@@ -51,129 +57,64 @@ render(
 );
 ```
 
+`render` compiles and renders in one call. Compile once and render many times with `template`:
+
+```js
+import { template } from "sjabloon/html";
+
+const greet = template("<p>Hello {{ name }}!</p>");
+
+greet({ name: "Robin" }); // => '<p>Hello Robin!</p>'
+greet({ name: "<script>" }); // => '<p>Hello &lt;script&gt;!</p>'
+```
+
+The third argument is your function registry. Templates can call only what you put there — there is no built-in helper library and no way for a template to reach anything you didn't pass in.
+
+Not rendering HTML? There are two other editions with the same syntax and a different output. See [Editions](#editions).
+
+## Is sjabloon the right tool?
+
+sjabloon renders a template against a values object. Templates can interpolate, branch, and loop. They cannot define variables, call out to anything you didn't register, or include other templates.
+
+**It fits when:**
+
+- Templates arrive at runtime — edited by users, stored in a CMS or database, pulled from a config file — so you can't precompile them at build time.
+- You ship under a strict CSP, or into a runtime where string-to-code is unavailable. This is the reason the package exists.
+- The people writing templates are not programmers, and `{{ }}` is a syntax they already recognise.
+- Bundle size is a real constraint, or you want a dependency tree you can read in an afternoon.
+
+**Look elsewhere when:**
+
+- Your templates are known at build time and speed matters most. Engines that generate specialised JavaScript render faster; precompiling them at build time also avoids `unsafe-eval`. See [Content Security Policy](#content-security-policy) for the measured tradeoff.
+- You need partials, includes, layout inheritance, macros, or custom block tags. sjabloon has a fixed set of blocks and no composition mechanism.
+- You need a sandbox or an HTML sanitizer. The HTML edition escapes interpolated values, but literal template text is copied through, and your registered functions do whatever they do. See [SECURITY.md](SECURITY.md).
+- You want a component model with state and lifecycle. This renders strings, once.
+- You need CommonJS, or Node older than 22.12. See [Environments](#environments).
+
+## Related packages
+
+sjabloon is the template layer of a three-package set that share one approach — parse to closures, never to code — and no runtime dependencies beyond each other:
+
+- **[xprsn](https://github.com/getquario/xprsn)** — the expression language sjabloon runs inside every tag, usable on its own if you need to evaluate _one_ expression against data rather than render text. Its [syntax reference](https://github.com/getquario/xprsn#syntax) is the reference for everything between the braces here.
+- **[padvinder](https://github.com/getquario/padvinder)** — a JSONPath engine, if you need to _select nodes_ out of a document. Filter evaluation is the part of JSONPath that has produced real code-injection CVEs elsewhere; padvinder parses filters to closures with no route to code execution, and passes the full RFC 9535 compliance suite as a standalone, zero-dependency package.
+
 ## Editions
 
 Three entry points, one engine. They share a parser, a syntax, and a diagnostics contract, and differ only in what a render produces.
 
 | Import          | `template(str, funcs?)` returns | `{{ expr }}` | `{{{ expr }}}` |
 | --------------- | ------------------------------- | ------------ | -------------- |
-| `sjabloon`      | `(values?, scope?) => Token[]`  | value token  | `SyntaxError`  |
-| `sjabloon/text` | `(values?, scope?) => string`   | unescaped    | `SyntaxError`  |
 | `sjabloon/html` | `(values?, scope?) => string`   | HTML-escaped | raw            |
+| `sjabloon/text` | `(values?, scope?) => string`   | unescaped    | `SyntaxError`  |
+| `sjabloon`      | `(values?, scope?) => Token[]`  | value token  | `SyntaxError`  |
 
-`{{{ }}}` exists only in the HTML edition, where "raw" means something. Everywhere else `{{ }}` is already raw, so the triple form is a compile-time `SJABLOON_RAW_TAG` error.
+- **`sjabloon/html`** for anything that ends up in a page or an email. Interpolated values are escaped; `{{{ expr }}}` opts out for a value you already trust.
+- **`sjabloon/text`** for output with no markup — a subject line, a filename, a log format, a Markdown file. Nothing is escaped, because there is nothing to escape it for.
+- **`sjabloon`** (the root entry) renders to a [token stream](#the-token-stream) instead of a string: the literal runs and the interpolated values, interleaved in render order, with values still in their original types. This is the one to reach for when the output isn't text at all — a spreadsheet cell that needs the number `1000` and a cell format, a PDF run, a structured document node.
 
-Every edition exports `template`, `render`, `isDiagnostic`, and `relocate`. They all resolve to one shared core, so a diagnostic thrown through any of them authenticates through all of them.
+`{{{ }}}` exists only in the HTML edition, where "raw" means something. Everywhere else `{{ }}` is already raw, so the triple form is a compile-time `SJABLOON_RAW_TAG` error rather than a silently different meaning.
 
-## API
-
-### `template(str, functions?, options?)`
-
-Compiles the template and returns a renderer. What it renders to depends on the edition you imported from (see [Editions](#editions)); everything else on this page is identical across all three. Malformed tags, unclosed blocks, and invalid expressions throw a `SyntaxError` at compile time.
-
-The anchors `$` (root) and `@` (current `{{#each}}` item) work as [described below](#syntax) with no extra arguments. At the root, before any loop, both point at `values`. If you're embedding sjabloon under an engine with its own scope model, pass `{ root, item }` as the second argument to seed the two root anchors from distinct objects: `$` becomes `root` and `@` becomes `item`. Omit `item` and `@` stays unbound at the root, so reading `@.x` throws where there is no current item. Either way, `{{#each}}` still re-points `@` to the current item inside its body.
-
-```js
-const tpl = template("{{ $.report }} / {{ @.row }}");
-tpl(base, { root: reportRoot, item: currentRow }); // $ = reportRoot, @ = currentRow
-tpl(base, { root: reportRoot }); // no item → @.x throws
-```
-
-The renderer carries `names` (every variable the template reads from your values, loop variables excluded) and `functions` (the registry functions it calls, methods excluded), both deduplicated. Check a stored template against your data model and its allowed functions before you render it, or fetch only the fields it needs.
-
-```js
-const tpl = template("{{ fmt(title) }}{{#each items as it}}{{ it.name }}{{/each}}", {
-  fmt: (s) => s,
-});
-tpl.names; // => ['title', 'items']
-tpl.functions; // => ['fmt']
-```
-
-`options.bound` lists names your engine already has in scope — a loop variable, a handle, a `page` anchor. They are excluded from `names` and still resolve normally at render time, the same contract as xprsn's own `bound`:
-
-```js
-template("{{ run.total }} of {{ count }}", undefined, { bound: ["run"] }).names; // => ['count']
-```
-
-The renderer also carries `reads`: every root-name read with its span in the template source, in source order. Duplicates, anchors, loop variables and bound names are all kept — `names` is the free, deduplicated view. This is what an editor squiggles, hovers, and jumps from:
-
-```js
-template("{{ title }}: {{ total }}").reads;
-// => [{ name: 'title', start: 3, end: 8 }, { name: 'total', start: 16, end: 21 }]
-```
-
-The renderer also carries its own `isDiagnostic(error)`: `true` only for runtime diagnostics thrown through this renderer, where the module-wide [`isDiagnostic`](#diagnostics) answers for every template. An embedder holding many compiled templates asks the one that just rendered, so a diagnostic that leaked from an unrelated template is not mistaken for this cell's.
-
-### `renderer.scoped(values)`
-
-The trusted-scope render, for an embedder whose scope chain already binds the anchors. The default call wraps `values` in a fresh scope and seeds `$` and `@` into it; `scoped` skips the wrapper: `$` and `@` resolve from `values` itself, and a chain that omits `@` leaves it unbound so `@.x` throws where there is no current item. `{{#each}}` still re-points `@` inside its body, and nothing is ever written to your objects. Rendering one template per cell per row over scopes you already build, this is the path with zero per-call allocations beyond the output.
-
-```js
-const row = Object.create(base); // base binds $ once per render
-row["@"] = item;
-tpl.scoped(row);
-```
-
-### `render(str, values?, functions?)`
-
-Shorthand for `template(str, functions)(values)`, returning whatever its edition renders.
-
-### `text(tokens)` (root entry only)
-
-Joins a token stream the way `sjabloon/text` would have rendered it: literals verbatim, values through `display()`. `text(template(str)(values))` and `sjabloon/text`'s `template(str)(values)` are equal for every template and every set of values. The test suite and the fuzzer both check that.
-
-### `display(value)` (root entry only)
-
-The scalar display rule every edition and `text()` share, exported for embedders that stringify token values themselves. A valid `Date` renders as ISO 8601 UTC (`toISOString()`) — the same bytes on every machine, where `String(date)` would bake in the host's timezone and locale. An invalid `Date` keeps its deterministic `'Invalid Date'` form, nullish displays empty, and everything else is `String(value)`.
-
-```js
-import { template, text } from "sjabloon";
-
-const tokens = template("{{ qty }} × {{ name }}")({ qty: 2, name: "Koffie" });
-// => [{ value: 2 }, { literal: ' × ' }, { value: 'Koffie' }]
-
-text(tokens); // => '2 × Koffie'
-```
-
-A `Token` is either `{ literal: string }` or `{ value: unknown }`:
-
-- **Values are pre-stringify.** `{{ total }}` holding `1000` yields the number `1000`, not `"1000"`, and nullish stays nullish. Stringification is deferred to `text()`, so a value with no primitive conversion reaches the stream intact and only fails when something asks for text.
-- **Order is render order.** Loop bodies append once per iteration, untaken branches append nothing, and block expressions (`#if` conditions, `#each` collections) never appear. They steer the render; they are not part of the stream.
-- **Literals are the template's static runs**, one token each, never merged and never empty. The interleaving tells you the shape: a bare `{{ amount }}` is exactly one value token, while `Total: {{ amount }}` is a literal followed by a value. That is why the engine emits tokens instead of a string plus a list of values. A spreadsheet cell that is _only_ a number is a different thing from one that happens to contain one.
-
-Literal tokens are frozen and shared across loop iterations; value tokens are fresh per emit.
-
-### Error diagnostics
-
-Sjabloon errors keep their native `SyntaxError` or `TypeError` class and expose:
-
-- `code`: a stable `SJABLOON_*` parser category or the original `XPRSN_*` expression category;
-- `start`: a zero-based offset in the original template;
-- `end`: the exclusive template offset;
-- `blocks`: a frozen, outermost-first array of `{ type, start, end }` opener spans.
-
-Parser codes are `SJABLOON_EACH_SYNTAX`, `SJABLOON_BLOCKED_BINDING`, `SJABLOON_UNEXPECTED_TAG`, `SJABLOON_UNKNOWN_BLOCK`, `SJABLOON_UNCLOSED_BLOCK`, `SJABLOON_RAW_TAG` (a `{{{ }}}` tag outside the HTML edition, located at the whole tag), and `SJABLOON_TOO_DEEP` (block nesting past 256 levels, located at the opener that crossed the cap). A missing closer uses an empty span at the end of the template. Expression offsets refer to the original template, so surrounding braces, whitespace, and trim markers contribute to their absolute position.
-
-Unauthenticated errors thrown by registered functions, getters, methods, or value coercion hooks are host errors. Sjabloon passes them through unchanged and does not attach template diagnostic fields.
-
-Use `isDiagnostic(error)` when a host needs to distinguish those errors. It returns `true` only for errors produced or translated by the same sjabloon module instance. Copying a documented `code`, `start`, `end`, and `blocks` onto another error does not authenticate it. A diagnostic from another installed copy or module instance returns `false`. All three editions share one core, so mixing them in a single process is safe: an error thrown through `sjabloon/html` authenticates through `sjabloon`.
-
-#### Relocating a diagnostic
-
-An embedder that compiles templates out of a larger document — a cell in a report, a field in a form — reports the fault in its own coordinates, not the template's. `relocate(diagnostic, { prefix, offset })` returns the copy to re-throw:
-
-```js
-import { isDiagnostic, relocate, template } from "sjabloon";
-
-try {
-  template(cell.value);
-} catch (error) {
-  if (!isDiagnostic(error)) throw error;
-  throw relocate(error, { prefix: "detail.cells[0].value: " });
-}
-```
-
-The copy keeps the original's class, prepends `prefix` to the message verbatim, shifts `start` and `end` by `offset`, and carries every other field across by descriptor — including the frozen `blocks` context, which stays frozen and non-writable on the copy. `blocks` is the same array, so its openers' own `start`/`end` stay in template coordinates while the error's span moves. It is registered exactly as the original was, so it passes `isDiagnostic` — and an expression fault, which is an xprsn diagnostic sjabloon translated into template coordinates, is relocated by xprsn so the copy stays authentic to both packages just as the original is. The original is left untouched. Relocation belongs here rather than in the embedder because authentication is by identity: a copy an embedder builds itself cannot be authenticated, and a field added to a diagnostic here would be a field the embedder's copy silently drops. Passing anything but a sjabloon diagnostic throws a `TypeError`.
+Every edition exports `template`, `render`, `isDiagnostic`, and `relocate`. They all resolve to one shared core, so a diagnostic thrown through any of them authenticates through all of them, and mixing editions in one process is safe.
 
 ## Syntax
 
@@ -193,12 +134,16 @@ Every `expr` is an [xprsn expression](https://github.com/getquario/xprsn#syntax)
 
 A loop body sees its loop variable plus the outer scope; reusing an outer name shadows it only inside that body. The engine keeps loop variables on a child scope, so the values you pass are never mutated.
 
+### Loop state
+
 Inside `{{#each}}`, a `loop` object holds the iteration state: `index` (1-based), `index0`, `first`, `last`, and `length`. Use `loop.last` for separators and trailing borders, or `loop.index` with `loop.length` for "row X of Y". Each nested loop gets its own.
 
 ```js
 render("{{#each xs as x}}{{ x }}{{#if not loop.last}}, {{/if}}{{/each}}", { xs: ["a", "b", "c"] });
 // => 'a, b, c'
 ```
+
+### Anchors
 
 Two anchors are always in scope: `$` is the root values and `@` is the current `{{#each}}` item (the root outside a loop). They let a nested body name the level it means instead of leaning on shadowing: `$.company` reaches the top, and `@.total` is whatever the innermost loop sits on.
 
@@ -212,11 +157,83 @@ render(
 
 Here the loop variable `company` shadows the root's for a bare name, but `$.company` still returns `'ACME'`. Anchors never count as `names`, and a blocked key through one (`$.constructor`) throws like anywhere else.
 
-## Content Security Policy
+A host with its own scope model can seed the two anchors from separate objects — see [Embedding sjabloon](EMBEDDING.md#seeding-the-anchors).
 
-sjabloon works under `script-src 'self'` with no `unsafe-eval`. Templates parse into a tree of closures that call other closures; xprsn compiles the expressions the same way. The test suite runs under `node --disallow-code-generation-from-strings`, which throws on any string-to-code construct exactly like a strict CSP does.
+## API
 
-That runtime CSP support costs some render speed. Handlebars and tempura generate specialized JavaScript, so their compiled renderers are faster but runtime compilation requires `unsafe-eval`. Build-time precompilation avoids that restriction when templates are known in advance. If templates arrive at runtime (user-edited templates, CMS content, email templates) and your CSP is strict, sjabloon fits. See the [comparison benchmarks](bench/comparison/) for cold-compile and hot-render comparisons.
+Identical across all three editions, except for what a render produces.
+
+### `template(str, functions?, options?)`
+
+Compiles the template and returns a renderer. Malformed tags, unclosed blocks, and invalid expressions throw a `SyntaxError` at compile time, so a template you compiled is a template that parses.
+
+The renderer carries `names` — every variable the template reads from your values, loop variables and anchors excluded — and `functions`, the registry functions it calls, methods excluded. Both are deduplicated.
+
+```js
+const tpl = template("{{ fmt(title) }}{{#each items as it}}{{ it.name }}{{/each}}", {
+  fmt: (s) => s,
+});
+
+tpl.names; // => ['title', 'items']
+tpl.functions; // => ['fmt']
+```
+
+Use them to check a stored template against your data model and its allowed functions before you render it, or to fetch only the fields it actually needs.
+
+Renderers carry three further members aimed at hosts: [`options.bound`](EMBEDDING.md#optionsbound) and [`reads`](EMBEDDING.md#reads) for validators and editors, and [`scoped`](EMBEDDING.md#rendererscopedvalues) for an engine that builds its own scope chain.
+
+### `render(str, values?, functions?)`
+
+Shorthand for `template(str, functions)(values)`, returning whatever its edition renders. Compiles on every call, so prefer `template` in a loop.
+
+### `text(tokens)` and `display(value)` (root entry only)
+
+`text` joins a token stream into a string the way `sjabloon/text` would have rendered it. `display` is the scalar rule both share, exported for embedders that stringify token values themselves. See [The token stream](#the-token-stream).
+
+### Error diagnostics
+
+Sjabloon errors keep their native `SyntaxError` or `TypeError` class and expose:
+
+- `code`: a stable `SJABLOON_*` parser category, or the original `XPRSN_*` category for a fault inside an expression;
+- `start`: a zero-based offset in the original template;
+- `end`: the exclusive template offset;
+- `blocks`: a frozen, outermost-first array of `{ type, start, end }` opener spans.
+
+Together they are enough to point whoever wrote the template at the character that broke it, and `blocks` says which enclosing block it happened in:
+
+```js
+import { isDiagnostic, template } from "sjabloon";
+
+try {
+  template("{{#if a}}oops");
+} catch (error) {
+  if (!isDiagnostic(error)) throw error;
+  error.code; // => 'SJABLOON_UNCLOSED_BLOCK'
+  error.start; // => 13   (end of template — nothing closed the block)
+  error.blocks; // => [{ type: 'if', start: 0, end: 9 }]
+}
+```
+
+Parser codes are `SJABLOON_EACH_SYNTAX`, `SJABLOON_BLOCKED_BINDING`, `SJABLOON_UNEXPECTED_TAG`, `SJABLOON_UNKNOWN_BLOCK`, `SJABLOON_UNCLOSED_BLOCK`, `SJABLOON_RAW_TAG` (a `{{{ }}}` tag outside the HTML edition, located at the whole tag), and `SJABLOON_TOO_DEEP` (block nesting past 256 levels, located at the opener that crossed the cap). A missing closer uses an empty span at the end of the template. Expression offsets refer to the original template, so surrounding braces, whitespace, and trim markers contribute to their absolute position.
+
+Errors thrown by registered functions, getters, methods, or value coercion hooks are host errors. Sjabloon passes them through unchanged and does not attach template diagnostic fields. `isDiagnostic(error)` is how you tell the two apart; it authenticates by identity rather than by shape, which has consequences worth knowing if you embed sjabloon — see [EMBEDDING.md](EMBEDDING.md#diagnostic-identity).
+
+## The token stream
+
+The root entry renders to tokens rather than a string. A render gives you the literal runs and the interpolated values, interleaved in render order:
+
+```js
+import { template, text } from "sjabloon";
+
+const tokens = template("{{ qty }} × {{ name }}")({ qty: 2, name: "Koffie" });
+// => [{ value: 2 }, { literal: ' × ' }, { value: 'Koffie' }]
+
+text(tokens); // => '2 × Koffie'
+```
+
+Values keep their original type — `{{ total * 1.21 }}` over `{ total: 1000 }` gives you the number `1210`, not `"1210"`. That is the point: different targets need different things from the same template. HTML wants escaped text; a spreadsheet wants the number and a cell format; a PDF wants a run with a font. Escaping and stringification belong at the output edge, not in the engine, so a string is just one way to consume the stream.
+
+If you are writing a renderer against these tokens, [EMBEDDING.md](EMBEDDING.md#the-token-contract) has the guarantees you can rely on — ordering, literal identity, and the `display` rule.
 
 ## Safety
 
@@ -225,11 +242,25 @@ That runtime CSP support costs some render speed. Handlebars and tempura generat
 - Templates read your values; they cannot assign to them.
 - Registered functions are host-provided capabilities, not a sandbox boundary. Only register helpers that template authors are allowed to invoke; likewise, treat explicit raw output as trusted HTML.
 
+sjabloon is not an HTML sanitizer: literal template text is copied to the output verbatim, so a template author can always write raw markup. [SECURITY.md](SECURITY.md) has the checklist to work through before accepting templates from people you don't trust, and the process for reporting a vulnerability.
+
+## Content Security Policy
+
+sjabloon works under `script-src 'self'` with no `unsafe-eval`. Templates parse into a tree of closures that call other closures; xprsn compiles the expressions the same way. The test suite runs under `node --disallow-code-generation-from-strings`, which throws on any string-to-code construct exactly like a strict CSP does.
+
+That runtime CSP support costs some render speed. Handlebars and tempura generate specialised JavaScript, so their compiled renderers are faster — but runtime compilation requires `unsafe-eval`, and build-time precompilation only avoids that when the templates are known in advance. If templates arrive at runtime and your CSP is strict, sjabloon fits; if they don't, an engine that precompiles is the faster answer. See the [comparison benchmarks](bench/comparison/) for cold-compile and hot-render numbers.
+
 ## Environments
 
 Node.js 22.12 and newer, ESM only. Browser use is supported through a standards-based ESM bundler in environments supporting ES2024. Direct `<script>` globals, UMD, and CommonJS builds are not provided.
 
 Shipping CommonJS alongside ESM would put two copies of the core in any process that mixed `require` and `import`. Each copy would have its own diagnostic identity, so `isDiagnostic` would return `false` across the seam.
+
+TypeScript declarations are hand-written and ship in the package; `npm run check` runs `attw` against them.
+
+## Embedding sjabloon
+
+If you compile templates out of a larger document — a cell in a report, a field in a form, a block in a page builder — [EMBEDDING.md](EMBEDDING.md) covers the surface built for that: seeding the anchors from your own scope chain, `scoped` renders, introspection for validators and editors, diagnostic identity, relocating a fault into your own coordinates, and the token contract.
 
 ## Contributing
 
@@ -240,7 +271,9 @@ npm install
 npm run check
 ```
 
-`npm run check` is the local gate. Conventions for this repo live in [AGENTS.md](AGENTS.md).
+`npm run check` is the local gate: formatting, lint, dead-code and dependency checks, the size budgets, the unit and type suites, the fuzz regression corpus, and the browser CSP run. It is the same gate CI runs, so a green `check` locally means a green pull request.
+
+Conventions for this repo — the parser, the semantics that look like bugs if you tidy them, and the commit format — live in [AGENTS.md](AGENTS.md).
 
 ## License
 

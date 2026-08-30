@@ -2,7 +2,7 @@
 
 Tiny, CSP-safe template engine powered by xprsn. Plain JS + JSDoc. `lib/core.js` is the engine; `lib/index.js`, `lib/text.js`, and `lib/html.js` are the three entries.
 
-Work is done when `npm run check` is green. Scripts live in `package.json`. Run them on Node: Bun accepts `--disallow-code-generation-from-strings` but does not enforce it. A single suite is `node --disallow-code-generation-from-strings --test test/render.test.js`. Public syntax and API live in `README.md`.
+Work is done when `npm run check` is green. Scripts live in `package.json`. Run them on Node: Bun accepts `--disallow-code-generation-from-strings` but does not enforce it. A single suite is `node --disallow-code-generation-from-strings --test test/render.test.js`. Public syntax and API live in `README.md`; the host-facing surface (anchor seeding, `scoped`, `bound`, `reads`, `relocate`, diagnostic identity, the token contract) lives in `EMBEDDING.md`.
 
 ## Architecture
 
