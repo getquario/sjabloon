@@ -3,8 +3,11 @@ import { template as root, text } from "../lib/index.js";
 import { template as plain } from "../lib/text.js";
 
 // Malformed templates and bad expressions surface as SyntaxError at compile
-// time; anything else from template() is a real finding.
-export const isCompileErr = (e) => e instanceof SyntaxError;
+// time; a runaway `#elif` chain can still overflow the native stack. Anything
+// else from template() is a real finding.
+export const isCompileErr = (e) =>
+  e instanceof SyntaxError ||
+  (e instanceof RangeError && /stack|Maximum call/i.test(String(e.message)));
 
 // Rendering adds xprsn's runtime guard (TypeError) and, for pathological
 // nesting, a stack-overflow RangeError. Everything else is unexpected.

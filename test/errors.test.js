@@ -34,6 +34,15 @@ test("xprsn compile diagnostics use absolute interpolation spans", () => {
   check(e, "XPRSN_SYNTAX", src.indexOf("+") + 1, src.indexOf("+") + 1);
 });
 
+test("an all-whitespace interpolation locates the empty expression on the last opener brace", () => {
+  check(
+    caught(() => template("{{ }}")),
+    "XPRSN_SYNTAX",
+    1,
+    1,
+  );
+});
+
 test("block expressions retain absolute spans and opener context", () => {
   let src = "{{#if 1 +}}x{{/if}}";
   let e = caught(() => template(src));
@@ -339,14 +348,10 @@ test("deeply nested blocks surface as a typed SyntaxError, not a stack overflow"
   assert.ok(isDiagnostic(e), "authenticated as a sjabloon diagnostic");
 });
 
-test("runaway elif chains stay a typed SyntaxError through the depth budget", () => {
+test("elif chains compile past the block-nesting cap", () => {
   const n = 300;
-  const deep = "{{#if a}}" + "{{#elif a}}".repeat(n) + "{{/if}}";
-  const e = caught(() => template(deep));
-  assert.ok(e instanceof SyntaxError, "a SyntaxError, not a RangeError");
-  assert.strictEqual(e.code, "SJABLOON_TOO_DEEP");
-  assert.strictEqual(e.blocks.length, 1, "elif links do not pollute block context");
-  assert.ok(isDiagnostic(e), "authenticated as a sjabloon diagnostic");
+  const src = "{{#if a}}" + "{{#elif a}}".repeat(n - 1) + "{{#elif true}}y{{/if}}";
+  assert.equal(template(src)({ a: false }), "y");
 });
 
 test("a renderer recognizes its own runtime diagnostics alone", () => {

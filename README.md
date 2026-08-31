@@ -214,7 +214,7 @@ try {
 }
 ```
 
-Parser codes are `SJABLOON_EACH_SYNTAX`, `SJABLOON_BLOCKED_BINDING`, `SJABLOON_UNEXPECTED_TAG`, `SJABLOON_UNKNOWN_BLOCK`, `SJABLOON_UNCLOSED_BLOCK`, `SJABLOON_RAW_TAG` (a `{{{ }}}` tag outside the HTML edition, located at the whole tag), and `SJABLOON_TOO_DEEP` (block nesting past 256 levels, located at the opener that crossed the cap). A missing closer uses an empty span at the end of the template. Expression offsets refer to the original template, so surrounding braces, whitespace, and trim markers contribute to their absolute position.
+Parser codes are `SJABLOON_EACH_SYNTAX`, `SJABLOON_BLOCKED_BINDING`, `SJABLOON_UNEXPECTED_TAG`, `SJABLOON_UNKNOWN_BLOCK`, `SJABLOON_UNCLOSED_BLOCK`, `SJABLOON_RAW_TAG` (a `{{{ }}}` tag outside the HTML edition, located at the whole tag), and `SJABLOON_TOO_DEEP` (block nesting past 256 levels, located at the opener that crossed the cap; `#elif` links are not nesting and do not count). A missing closer uses an empty span at the end of the template. Expression offsets refer to the original template, so surrounding braces, whitespace, and trim markers contribute to their absolute position.
 
 Errors thrown by registered functions, getters, methods, or value coercion hooks are host errors. Sjabloon passes them through unchanged and does not attach template diagnostic fields. `isDiagnostic(error)` is how you tell the two apart; it authenticates by identity rather than by shape, which has consequences worth knowing if you embed sjabloon — see [EMBEDDING.md](EMBEDDING.md#diagnostic-identity).
 
