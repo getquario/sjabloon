@@ -93,7 +93,7 @@ sjabloon renders a template against a values object. Templates can interpolate, 
 
 ## Related packages
 
-sjabloon is the template layer of a three-package set that share one approach — parse to closures, never to code — and no runtime dependencies beyond each other:
+sjabloon is the template layer of a set that shares one approach — parse to closures, never to code — and whose only runtime dependencies are each other and [waarmerk](https://github.com/getquario/waarmerk), the located-diagnostic module they mint through:
 
 - **[xprsn](https://github.com/getquario/xprsn)** — the expression language sjabloon runs inside every tag, usable on its own if you need to evaluate _one_ expression against data rather than render text. Its [syntax reference](https://github.com/getquario/xprsn#syntax) is the reference for everything between the braces here.
 - **[padvinder](https://github.com/getquario/padvinder)** — a JSONPath engine, if you need to _select nodes_ out of a document. Filter evaluation is the part of JSONPath that has produced real code-injection CVEs elsewhere; padvinder parses filters to closures with no route to code execution, and passes the full RFC 9535 compliance suite.
