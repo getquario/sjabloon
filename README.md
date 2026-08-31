@@ -268,6 +268,7 @@ If you compile templates out of a larger document — a cell in a report, a fiel
 git clone https://github.com/getquario/sjabloon.git
 cd sjabloon
 npm install
+git config core.hooksPath .githooks   # enable the commit-msg hook
 npm run check
 ```
 
