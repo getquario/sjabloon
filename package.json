@@ -1,6 +1,6 @@
 {
   "name": "sjabloon",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Tiny, CSP-safe template engine for JavaScript, powered by xprsn expressions. No eval, no new Function.",
   "keywords": [
     "csp",
