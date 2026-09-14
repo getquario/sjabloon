@@ -29,6 +29,12 @@ const owned: boolean = render.isDiagnostic(new Error("x"));
 const bound: Token[] = template("{{ run.x }}", undefined, { bound: new Set(["run"]) })({});
 const boundText: string = textTemplate("{{ x }}", undefined, { bound: ["a"] })({ x: 1 });
 const boundHtml: string = htmlTemplate("{{ x }}", undefined, { bound: ["a"] })({ x: 1 });
+// A tag's keys are the embedder's own, so the embedder's token type is where
+// they are declared: the stream stays `Token[]`, intersected where it is read.
+type Fielded = Token & { field?: string };
+const tagged: Fielded[] = template("{{ page.number }}", undefined, {
+  tag: (expr: string) => (expr === "page.number" ? { field: expr } : undefined),
+})({ page: { number: 1 } });
 
 // @ts-expect-error the root entry renders tokens, not a string
 const wrongRoot: string = template("{{ x }}")({});
@@ -74,6 +80,7 @@ void [
   bound,
   boundText,
   boundHtml,
+  tagged,
   wrongRoot,
   wrongHtml,
   codes,

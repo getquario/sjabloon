@@ -104,7 +104,23 @@ export interface SjabloonRenderer<T> {
 export type SjabloonTemplate<T> = (
   str: string,
   funcs?: SjabloonFunctions,
-  opts?: { bound?: Iterable<string> },
+  opts?: {
+    bound?: Iterable<string>;
+    /**
+     * Name an interpolation by what it says. Called once per `{{ }}` while
+     * compiling, with that interpolation's expression source as written and
+     * trimmed (`{{- page.number -}}` is `"page.number"`), and never again at
+     * render time. Returned keys join every value token that interpolation
+     * emits; `value` and `literal` are the stream's own, so a tag may not
+     * supply either. It runs inside the parse, which is shared synchronous
+     * state: read the expression and return, and compile no template from
+     * within it. Block expressions
+     * (`#if` conditions, `#each` collections) emit no token and are not
+     * offered. The token edition alone has tokens to carry them; the string
+     * editions ignore this.
+     */
+    tag?: (expr: string) => object | undefined;
+  },
 ) => SjabloonRenderer<T>;
 
 /** Compile and render in one go. Shorthand for `template(str, funcs)(values)`. */
@@ -119,7 +135,13 @@ export interface LiteralToken {
   literal: string;
 }
 
-/** One `{{ }}` interpolation, pre-stringify. Nullish values are preserved. */
+/**
+ * One `{{ }}` interpolation, pre-stringify. Nullish values are preserved.
+ *
+ * A compile that passed `tag` also carries that interpolation's returned keys
+ * here, under the names the embedder chose; declare them by intersecting this
+ * type with your own, as `ValueToken & { field?: string }`.
+ */
 export interface ValueToken {
   value: unknown;
 }

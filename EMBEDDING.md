@@ -191,6 +191,42 @@ on:
   fresh per emit. Do not mutate or key a cache on a literal token's identity
   across iterations.
 
+### Naming an interpolation with `tag`
+
+A value token carries its value and nothing about where it came from, so an
+embedder that has to treat one interpolation differently from the rest — a page
+number a word processor writes as a live field, rather than the number the
+render happened to see — cannot tell them apart from the stream. `tag` is that
+seam:
+
+```js
+const FIELD = { "page.number": { field: "page.number" } };
+const tpl = template("Page {{ page.number }} of {{ page.total }}", fns, {
+  tag: (expr) => FIELD[expr],
+});
+tpl({ page: { number: 1, total: 2 } });
+// [{ literal: 'Page ' }, { value: 1, field: 'page.number' }, { literal: ' of ' }, { value: 2 }]
+```
+
+- **Called once per interpolation, while compiling.** Never at render time, so
+  what a token carries is a compile-time constant and a hot render pays nothing
+  for the keys it does not have. A template compiled without `tag` emits the
+  exact closure and the exact stream it always did.
+- **The argument is the expression source as written and trimmed.** `{{ x }}`,
+  `{{x}}` and `{{- x -}}` all arrive as `'x'`, so an equality test against the
+  spelling you are looking for is exact. Match it, or return `undefined` and the
+  token is untouched.
+- **The returned keys join every value token that interpolation emits** — once
+  per loop iteration, under the names you chose. `value` and `literal` are the
+  stream's own: `value` is written last so a tag cannot take it over, and
+  returning `literal` would make a token answer to both kinds, so do not.
+- **It runs inside the parse**, which is shared, synchronous state. Read the
+  expression and return; do not compile another template from within it.
+- **Block expressions are not offered.** `#if` conditions and `#each`
+  collections steer the render and emit no token, so there is nothing to name.
+- The token edition alone has tokens to carry the keys; `sjabloon/text` and
+  `sjabloon/html` ignore the option.
+
 `text(tokens)` joins a stream the way `sjabloon/text` would have rendered it, and
 the two are equal for every template and every set of values. The test suite and
 the fuzzer both check that.

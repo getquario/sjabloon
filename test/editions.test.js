@@ -132,3 +132,16 @@ test("every edition displays a Date as ISO 8601 UTC", () => {
     "the token join agrees with the string editions",
   );
 });
+
+// `tag` names an interpolation so a token can carry what the embedder made of
+// it. The string editions render text and have no token to hang it on, so the
+// option reaches them and changes nothing.
+test("tag is the token edition's alone", () => {
+  const tag = () => ({ field: "page.number" });
+  assert.deepStrictEqual(root.template("Page {{ n }}", undefined, { tag })({ n: 1 }), [
+    { literal: "Page " },
+    { value: 1, field: "page.number" },
+  ]);
+  assert.strictEqual(plain.template("Page {{ n }}", undefined, { tag })({ n: 1 }), "Page 1");
+  assert.strictEqual(html.template("Page {{ n }}", undefined, { tag })({ n: 1 }), "Page 1");
+});

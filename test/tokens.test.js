@@ -160,3 +160,63 @@ test("stringification is deferred, so text() fails where the stream did not", ()
     "the string edition fails at render",
   );
 });
+
+// The compile-time tag. An embedder that has to treat one interpolation
+// differently from the rest — a page number a word processor writes as a live
+// field, say — cannot tell them apart from the stream: a value token carries
+// its value and nothing about where it came from. `tag` is the seam. It is
+// read once per interpolation while parsing, so the emitted token carries a
+// compile-time constant and a template no embedder tagged keeps the exact
+// stream it always had.
+test("tag names an interpolation by its expression source", () => {
+  const tag = (expr) => (expr === "page.number" ? { field: "page.number" } : undefined);
+  const opts = { tag };
+  assert.deepStrictEqual(
+    template(
+      "Page {{ page.number }} of {{ page.total }}",
+      undefined,
+      opts,
+    )({
+      page: { number: 1, total: 2 },
+    }),
+    [lit("Page "), { value: 1, field: "page.number" }, lit(" of "), val(2)],
+    "the returned keys join the value token; an undefined leaves it untouched",
+  );
+  assert.deepStrictEqual(
+    template("{{- page.number -}}", undefined, opts)({ page: { number: 3 } }),
+    [{ value: 3, field: "page.number" }],
+    "the source is the expression as trimmed, so whitespace and dashes do not hide it",
+  );
+  assert.deepStrictEqual(
+    template("{{ page.number }}")({ page: { number: 1 } }),
+    [val(1)],
+    "no tag, no key",
+  );
+  assert.deepStrictEqual(
+    template("{{ x }}", undefined, { tag: () => ({ value: "taken over" }) })({ x: 1 }),
+    [val(1)],
+    "`value` is the token's own; a tag cannot take it over",
+  );
+});
+
+test("tag sees interpolations only, once each, at compile time", () => {
+  const seen = [];
+  const tpl = template("{{#if on}}{{#each xs as x}}{{ x }}{{/each}}{{/if}}", undefined, {
+    tag: (expr) => void seen.push(expr),
+  });
+  assert.deepStrictEqual(seen, ["x"], "block expressions steer the render and emit no token");
+  tpl({ on: true, xs: [1, 2] });
+  tpl({ on: true, xs: [1, 2] });
+  assert.deepStrictEqual(seen, ["x"], "and a render never asks again");
+});
+
+test("a tagged interpolation carries its keys on every emit", () => {
+  const tokens = template("{{#each xs as x}}{{ x }}{{/each}}", undefined, {
+    tag: () => ({ field: "x" }),
+  })({ xs: [1, 2] });
+  assert.deepStrictEqual(tokens, [
+    { value: 1, field: "x" },
+    { value: 2, field: "x" },
+  ]);
+  assert.notStrictEqual(tokens[0], tokens[1], "value tokens stay fresh per emit");
+});
