@@ -1,19 +1,26 @@
 # sjabloon
 
-A tiny, CSP-safe template engine for JavaScript. **~1.9KB min+brotli (~3.7KB with [xprsn](https://www.npmjs.com/package/xprsn)), two tiny dependencies.**
+A tiny template engine for JavaScript that renders familiar `{{ }}` templates — interpolation, `{{#if}}`, `{{#each}}` — without ever turning template text into JavaScript. There is no `eval` and no `new Function`, so a template that arrives at runtime, out of a database or a user's editor, still renders under a strict Content Security Policy, where engines that compile templates to code cannot.
 
-[![NPM version](https://img.shields.io/npm/v/sjabloon.svg)](https://www.npmjs.com/package/sjabloon)
-[![Build Status](https://github.com/getquario/sjabloon/actions/workflows/test.yml/badge.svg)](https://github.com/getquario/sjabloon/actions/workflows/test.yml)
-[![NPM downloads](https://img.shields.io/npm/dm/sjabloon.svg)](https://www.npmjs.com/package/sjabloon)
-[![Apache-2.0 license](https://img.shields.io/github/license/getquario/sjabloon.svg)](https://github.com/getquario/sjabloon/blob/main/LICENSE)
+_Sjabloon_ is Dutch for "template". Every tag holds a full [xprsn](https://github.com/getquario/xprsn) expression, so conditions read like `{{#if total >= 100 and "vip" in user.roles}}` rather than needing a helper.
 
-<a href="https://webstronauts.com?utm_source=github&utm_medium=readme&utm_campaign=sjabloon">
-	<picture>
-		<img src="https://webstronauts.com/images/sponsored-by.svg" alt="Sponsored by The Webstronauts" width="200" height="65">
-	</picture>
-</a>
+- **Escapes by default.** In the HTML edition every interpolated value is escaped; `{{{ expr }}}` opts out for one you already trust.
+- **Three editions, one engine.** `sjabloon/html` and `sjabloon/text` return strings; the root entry returns a `Token[]` with values still in their original types — for output that isn't text at all, like a spreadsheet cell that needs the number `1000` and a cell format.
+- **Tiny.** 2.1 kB minified and brotlied, or 4.1 kB with xprsn and waarmerk bundled in.
+- **Quick on runtime templates.** Compiling and rendering a fresh 10-row escaped template: ~96k ops/sec, about 7x Handlebars and level with Mustache. Code-generating engines win the hot-render loop instead — [the full table](bench/comparison/readme.md) shows both sides of the trade.
+- **CSP-safe.** The suite runs on `node --disallow-code-generation-from-strings`, and a Playwright run loads the published files under `script-src 'self'`.
+- **Hardened.** 73 tests at 100% branch coverage, plus three fuzz targets.
 
-_Sjabloon_ is Dutch for "template". It renders familiar `{{ }}` templates — interpolation, `{{#if}}`, `{{#each}}` — with full [xprsn](https://github.com/getquario/xprsn) expressions inside every tag, and never turns template text into JavaScript. There is no `eval` and no `new Function`, so templates that arrive at runtime still render under a strict Content Security Policy, where engines that compile templates to code cannot.
+```js
+import { template } from "sjabloon/html";
+
+const greet = template("<p>Hello {{ name }}!</p>");
+
+greet({ name: "Robin" }); //=> '<p>Hello Robin!</p>'
+greet({ name: "<script>" }); //=> '<p>Hello &lt;script&gt;!</p>'
+```
+
+<img src="https://getquario.com/favicon.svg" alt="Quario logo" width="16" height="16" /> <b>sjabloon</b> is built by the team behind <b><a href="https://getquario.com?utm_source=github&utm_medium=readme&utm_campaign=sjabloon">Quario</a></b>, a declarative reporting engine for JavaScript that renders JSON report definitions to <b>HTML, PDF, workbooks, and Word</b> — without <code>eval</code>.
 
 ## Contents
 
