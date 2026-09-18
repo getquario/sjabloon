@@ -9,21 +9,28 @@ escaped one. The template source is identical between them — only the edition
 differs. The root entry is not benchmarked here: it emits `Token[]` rather than
 a string, so there is nothing to compare byte for byte.
 
-## Results (2026-08-16)
+## Results (2026-09-18)
 
-One run on Node v24.18.0, macOS arm64. Versions: sjabloon 0.7.0,
+One run on Node v24.18.0, macOS arm64. Versions: sjabloon 0.13.0,
 Tempura 0.4.1, Handlebars 4.7.9, and Mustache 4.2.0. Values are median
 operations per second; the parenthesized number is throughput relative to
 sjabloon.
 
 | Workload                |        sjabloon |            Tempura |      Handlebars |        Mustache |
 | ----------------------- | --------------: | -----------------: | --------------: | --------------: |
-| Cold raw, 10 rows       | 178,949 (1.00x) |    483,076 (2.70x) |  13,728 (0.08x) | 198,490 (1.11x) |
-| Cold escaped, 10 rows   | 105,340 (1.00x) |    205,353 (1.95x) |  13,811 (0.13x) | 111,663 (1.06x) |
-| Hot raw, 10 rows        | 380,619 (1.00x) | 4,123,696 (10.83x) | 722,157 (1.90x) | 683,304 (1.80x) |
-| Hot raw, 1,000 rows     |   7,326 (1.00x) |     49,026 (6.69x) |  12,073 (1.65x) |   8,895 (1.21x) |
-| Hot escaped, 10 rows    | 150,419 (1.00x) |    333,899 (2.22x) | 183,846 (1.22x) | 184,984 (1.23x) |
-| Hot escaped, 1,000 rows |   1,889 (1.00x) |      3,471 (1.84x) |   2,071 (1.10x) |   1,902 (1.01x) |
+| Cold raw, 10 rows       | 157,557 (1.00x) |    473,334 (3.00x) |  13,914 (0.09x) | 198,070 (1.26x) |
+| Cold escaped, 10 rows   |  98,528 (1.00x) |    203,861 (2.07x) |  13,963 (0.14x) | 111,674 (1.13x) |
+| Hot raw, 10 rows        | 369,890 (1.00x) | 4,065,327 (10.99x) | 718,317 (1.94x) | 677,419 (1.83x) |
+| Hot raw, 1,000 rows     |   6,271 (1.00x) |     48,994 (7.81x) |  11,993 (1.91x) |   8,585 (1.37x) |
+| Hot escaped, 10 rows    | 149,938 (1.00x) |    333,140 (2.22x) | 183,656 (1.22x) | 183,792 (1.23x) |
+| Hot escaped, 1,000 rows |   1,825 (1.00x) |      3,471 (1.90x) |   2,077 (1.14x) |   1,870 (1.02x) |
+
+The previous table was recorded against 0.7.0, which exported one string
+edition and shipped a build of `src/`. Those numbers are not comparable with
+these, so they are not carried forward as a baseline. Against 0.11.0 — the last
+release before the parser and diagnostics refactors, measured on this machine
+with this script — the hot-render rows land within 5% either way and cold
+compile is about 4% slower.
 
 The native-prepare diagnostic is omitted because the engine APIs do different
 amounts of work at that stage.

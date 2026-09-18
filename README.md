@@ -7,7 +7,7 @@ _Sjabloon_ is Dutch for "template". Every tag holds a full [xprsn](https://githu
 - **Escapes by default.** In the HTML edition every interpolated value is escaped; `{{{ expr }}}` opts out for one you already trust.
 - **Three editions, one engine.** `sjabloon/html` and `sjabloon/text` return strings; the root entry returns a `Token[]` with values still in their original types — for output that isn't text at all, like a spreadsheet cell that needs the number `1000` and a cell format.
 - **Tiny.** 2.1 kB minified and brotlied, or 4.1 kB with xprsn and waarmerk bundled in.
-- **Quick on runtime templates.** Compiling and rendering a fresh 10-row escaped template: ~96k ops/sec, about 7x Handlebars and level with Mustache. Code-generating engines win the hot-render loop instead — [the full table](bench/comparison/readme.md) shows both sides of the trade.
+- **Quick on runtime templates.** Compiling and rendering a fresh 10-row escaped template: ~99k ops/sec, about 7x Handlebars and a little behind Mustache. Code-generating engines win the hot-render loop instead — [the full table](bench/comparison/readme.md) shows both sides of the trade.
 - **CSP-safe.** The suite runs on `node --disallow-code-generation-from-strings`, and a Playwright run loads the published files under `script-src 'self'`.
 - **Hardened.** 73 tests at 100% branch coverage, plus three fuzz targets.
 
