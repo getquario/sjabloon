@@ -37,6 +37,20 @@ test("escaping is html only", () => {
   );
 });
 
+test("html escaping keeps the text around every match", () => {
+  // Every other fixture here ends on a character that escapes, so the text
+  // after the last match is the one part of the walk nothing else pins.
+  assert.strictEqual(html.render("{{ x }}", { x: "a & b" }), "a &amp; b");
+  assert.strictEqual(html.render("{{ x }}", { x: "&start" }), "&amp;start");
+  assert.strictEqual(html.render("{{ x }}", { x: "end&" }), "end&amp;");
+  assert.strictEqual(html.render("{{ x }}", { x: "&&" }), "&amp;&amp;");
+  assert.strictEqual(html.render("{{ x }}", { x: "nothing to escape" }), "nothing to escape");
+  assert.strictEqual(html.render("{{ x }}", { x: "" }), "");
+  const twice = html.template("{{ x }}");
+  assert.strictEqual(twice({ x: "a&b" }), "a&amp;b", "one value does not disturb the next");
+  assert.strictEqual(twice({ x: "c&d" }), "c&amp;d");
+});
+
 test("{{{ }}} is raw in html and a located error everywhere else", () => {
   assert.strictEqual(html.render("{{{ x }}}", { x: "<b>bold</b>" }), "<b>bold</b>");
   assert.strictEqual(

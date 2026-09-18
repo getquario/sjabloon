@@ -9,7 +9,7 @@ _Sjabloon_ is Dutch for "template". Every tag holds a full [xprsn](https://githu
 - **Tiny.** 2.1 kB minified and brotlied, or 4.1 kB with xprsn and waarmerk bundled in.
 - **Quick on runtime templates.** Compiling and rendering a fresh 10-row escaped template: ~99k ops/sec, about 7x Handlebars and a little behind Mustache. Code-generating engines win the hot-render loop instead — [the full table](bench/comparison/readme.md) shows both sides of the trade.
 - **CSP-safe.** The suite runs on `node --disallow-code-generation-from-strings`, and a Playwright run loads the published files under `script-src 'self'`.
-- **Hardened.** 73 tests at 100% branch coverage, plus three fuzz targets.
+- **Hardened.** 74 tests at 100% branch coverage, plus three fuzz targets.
 
 ```js
 import { template } from "sjabloon/html";
