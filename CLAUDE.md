@@ -63,7 +63,7 @@ Omakase: one obvious path over knobs. Test the guarantee a user relies on. Add c
 - `oxlint-tsgolint` is the binary that runs the type-aware rules; without it they drop silently.
 - `test/types.check.ts` ends scopes with `void [...]` so type-only bindings stay live under `no-unused-vars`.
 - Source-scan tests use `globSync("lib/**/*.js")`, never a hardcoded filename.
-- Fallow defaults are the gate. Split and table-drive until shipped functions sit under them; leave `maxCognitive` and `maxCrap` alone. With no coverage file, estimated CRAP wants cyclomatic below 5. Duplicated helpers in `fuzz/` get exported. A second name in `ignoreDependencies` means a real graph edge is missing.
+- Fallow defaults are the gate. Split and table-drive until shipped functions sit under them; leave `maxCognitive` and `maxCrap` alone. It runs in two halves: `fallow:lint` is dead code and duplication and needs no coverage, while `fallow:health` scores complexity against `coverage/coverage-final.json` and runs after the suite that writes it. Given coverage, CRAP collapses towards plain cyclomatic and `maxCyclomatic` is what binds; without it, every function scores as untested and the ceiling wants cyclomatic below 5 instead. `fallow:health` fails on a missing file rather than estimating, so run the suite first. Duplicated helpers in `fuzz/` get exported. A second name in `ignoreDependencies` means a real graph edge is missing.
 
 ## Code comments
 
