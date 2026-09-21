@@ -295,3 +295,14 @@ test("an unsupplied slot falls back to its own call", () => {
     "a supplied undefined is a value, not a hole",
   );
 });
+
+test("a slot names the registry functions it calls", () => {
+  const { look } = counted();
+  const f = template("{{ look(a) }}{{ look(b) + 1 }}", { look, twice: (x) => x * 2 });
+  assert.deepStrictEqual(f.slots[0].functions, ["look"], "one call, one name");
+  assert.deepStrictEqual(
+    template("{{ twice(look(a)) }}", { look, twice: (x) => x }).slots[0].functions,
+    ["twice", "look"],
+    "every name the expression calls, in call order",
+  );
+});

@@ -96,13 +96,24 @@ export interface SjabloonScope {
  * and the call is not made; an index the array does not hold evaluates
  * normally, so `undefined` is a value rather than a hole.
  */
+/**
+ * One interpolation a registry function answers: call it with any scope to
+ * evaluate that expression alone. `functions` are the registry names it calls,
+ * so an embedder can tell a slot it must settle from one it already knows is
+ * synchronous.
+ */
+export interface SjabloonSlot {
+  (values: SjabloonValues): unknown;
+  functions: string[];
+}
+
 export interface SjabloonRenderer<T> {
   (values?: SjabloonValues, scope?: SjabloonScope): T;
   names: string[];
   reads: SjabloonRead[];
   functions: string[];
   isDiagnostic(error: unknown): boolean;
-  slots: ((values: SjabloonValues) => unknown)[];
+  slots: SjabloonSlot[];
   scoped(values: SjabloonValues, supply?: readonly unknown[]): T;
 }
 

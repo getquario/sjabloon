@@ -86,6 +86,10 @@ does not hold evaluates normally, so a supplied `undefined` is a value rather
 than a hole. Everything else in the template is evaluated once, by the render:
 only the calls move.
 
+Each entry also carries `functions`, the registry names that expression calls.
+A registry that mixes your own synchronous helpers with the host's needs it:
+only a slot naming a host function has to be settled.
+
 Two things to hold. `slots` is the template's calls, not a render's — a slot
 inside an untaken `{{#if}}` branch is still listed, so resolving every slot can
 fetch more than one render reads. And a slot evaluates against the scope you
