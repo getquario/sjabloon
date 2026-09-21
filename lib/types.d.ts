@@ -85,6 +85,16 @@ export interface SjabloonScope {
  * chain that omits `@` leaves it unbound so `@.x` throws through xprsn's
  * guard. The zero-allocation seam for an embedder rendering over scopes it
  * already builds; `{{#each}}` still re-points `@` inside its body.
+ *
+ * `slots` are the interpolations a registry function answers, in source order:
+ * one entry per `{{ ... }}` whose expression calls one, and none for a block's
+ * own expression, which renders no token. Each entry evaluates that
+ * expression alone, against whatever scope you hand it. An embedder that must
+ * resolve a value out of band -- a registry function reaching a network,
+ * which an expression cannot await -- runs the slot itself and hands the
+ * answer back as `supply[i]` to `scoped`. A supplied index replaces the call
+ * and the call is not made; an index the array does not hold evaluates
+ * normally, so `undefined` is a value rather than a hole.
  */
 export interface SjabloonRenderer<T> {
   (values?: SjabloonValues, scope?: SjabloonScope): T;
@@ -92,7 +102,8 @@ export interface SjabloonRenderer<T> {
   reads: SjabloonRead[];
   functions: string[];
   isDiagnostic(error: unknown): boolean;
-  scoped(values: SjabloonValues): T;
+  slots: ((values: SjabloonValues) => unknown)[];
+  scoped(values: SjabloonValues, supply?: readonly unknown[]): T;
 }
 
 /**

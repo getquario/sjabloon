@@ -220,3 +220,78 @@ test("a tagged interpolation carries its keys on every emit", () => {
   ]);
   assert.notStrictEqual(tokens[0], tokens[1], "value tokens stay fresh per emit");
 });
+
+// An embedder that resolves a value out of band -- a host function reaching a
+// network -- needs two things: the call on its own, so it can run it against a
+// scope of its choosing, and a way to hand the answer back for the render.
+const counted = () => {
+  const seen = [];
+  return { seen, look: (x) => (seen.push(x), "got:" + x) };
+};
+
+test("slots expose the interpolations a registry function answers", () => {
+  const { look } = counted();
+  const f = template("{{ look(a) }} and {{ b }} and {{ look(c) }}", { look });
+  assert.strictEqual(f.slots.length, 2, "one slot per call-bearing interpolation");
+  assert.strictEqual(f.slots[0]({ a: 1 }), "got:1", "a slot evaluates its own expression");
+  assert.strictEqual(f.slots[1]({ c: 2 }), "got:2", "slots are in source order");
+  assert.deepStrictEqual(template("{{ a }}{{ b }}", { look }).slots, [], "no calls, no slots");
+});
+
+test("a block's own expression is not a slot", () => {
+  const { look } = counted();
+  assert.deepStrictEqual(
+    template("{{#if look(a)}}{{ b }}{{/if}}", { look }).slots,
+    [],
+    "an #if condition renders no token, so it holds no slot",
+  );
+  assert.deepStrictEqual(
+    template("{{#each look(a) as r}}{{ r }}{{/each}}", { look }).slots,
+    [],
+    "nor does an #each list",
+  );
+});
+
+test("a supplied value replaces the call, and the call is not made", () => {
+  const { seen, look } = counted();
+  const f = template("x{{ look(a) }}y{{ look(c) }}", { look });
+  assert.deepStrictEqual(
+    f.scoped({ a: 1, c: 2 }, ["one", "two"]),
+    [lit("x"), val("one"), lit("y"), val("two")],
+    "each slot takes its supplied value",
+  );
+  assert.deepStrictEqual(seen, [], "nothing was called");
+  assert.deepStrictEqual(
+    f.scoped({ a: 1, c: 2 }),
+    [lit("x"), val("got:1"), lit("y"), val("got:2")],
+    "a render with no supply evaluates as before",
+  );
+  assert.deepStrictEqual(seen, [1, 2], "and calls once each");
+});
+
+test("a supply does not leak into the next render", () => {
+  const { look } = counted();
+  const f = template("{{ look(a) }}", { look });
+  assert.deepStrictEqual(f.scoped({ a: 1 }, ["held"]), [val("held")]);
+  assert.deepStrictEqual(f({ a: 9 }), [val("got:9")], "the default render is unaffected");
+  const g = template("{{ look(a) }}", { look });
+  assert.deepStrictEqual(g.scoped({ a: 4 }), [val("got:4")], "another template is unaffected");
+});
+
+test("an unsupplied slot falls back to its own call", () => {
+  const { look } = counted();
+  const f = template("{{ look(a) }}{{ look(b) }}", { look });
+  // Built rather than written as a literal: the hole at 0 is the subject.
+  const holed = [];
+  holed[1] = "given";
+  assert.deepStrictEqual(
+    f.scoped({ a: 1, b: 2 }, holed),
+    [val("got:1"), val("given")],
+    "a hole in the supply evaluates normally",
+  );
+  assert.deepStrictEqual(
+    f.scoped({ a: 1, b: 2 }, [undefined, "given"]),
+    [val(undefined), val("given")],
+    "a supplied undefined is a value, not a hole",
+  );
+});

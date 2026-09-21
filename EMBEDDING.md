@@ -11,6 +11,7 @@ codes.
 
 - [Seeding the anchors](#seeding-the-anchors)
 - [`renderer.scoped(values)`](#rendererscopedvalues)
+- [Resolving a value out of band](#resolving-a-value-out-of-band)
 - [Introspection](#introspection)
   - [`options.bound`](#optionsbound)
   - [`reads`](#reads)
@@ -57,6 +58,39 @@ tpl.scoped(row);
 
 Rendering one template per cell per row over scopes you already build, this is
 the path with zero per-call allocations beyond the output.
+
+## Resolving a value out of band
+
+An expression cannot await. A registry function that reaches a network
+therefore returns a promise, and xprsn hands that promise back only where the
+call is the whole expression — anywhere else it is a `XPRSN_PENDING_VALUE`
+fault, because an operator would consume it unawaited.
+
+`renderer.slots` is how you act on that. It holds one entry per `{{ ... }}`
+whose expression calls a registry function, in source order, and none for a
+block's own expression, which renders no token. Each entry evaluates that
+expression alone against whatever scope you hand it, so you can run the calls
+first, settle them together, and render once:
+
+```js
+const tpl = template("{{ name(id) }} owes {{ amount }}", { name: fetchName });
+
+const pending = tpl.slots.map((slot) => slot(row));
+const supply = await Promise.all(pending);
+
+tpl.scoped(row, supply);
+```
+
+`supply[i]` replaces slot `i` and that call is not made. An index the array
+does not hold evaluates normally, so a supplied `undefined` is a value rather
+than a hole. Everything else in the template is evaluated once, by the render:
+only the calls move.
+
+Two things to hold. `slots` is the template's calls, not a render's — a slot
+inside an untaken `{{#if}}` branch is still listed, so resolving every slot can
+fetch more than one render reads. And a slot evaluates against the scope you
+pass it, which need not be the render's: the point is usually that it is
+smaller.
 
 ## Introspection
 
