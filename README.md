@@ -105,6 +105,8 @@ sjabloon is the template layer of a set that shares one approach — parse to cl
 - **[xprsn](https://github.com/getquario/xprsn)** — the expression language sjabloon runs inside every tag, usable on its own if you need to evaluate _one_ expression against data rather than render text. Its [syntax reference](https://github.com/getquario/xprsn#syntax) is the reference for everything between the braces here.
 - **[padvinder](https://github.com/getquario/padvinder)** — a JSONPath engine, if you need to _select nodes_ out of a document. Filter evaluation is the part of JSONPath that has produced real code-injection CVEs elsewhere; padvinder parses filters to closures with no route to code execution, and passes the full RFC 9535 compliance suite.
 
+Outside that set, [werkmap](https://github.com/getquario/werkmap) is an `.xlsx` writer from the same team, if the token stream is headed for a spreadsheet: a token keeps its value's type, and werkmap writes it as a typed cell.
+
 ## Editions
 
 Three entry points, one engine. They share a parser, a syntax, and a diagnostics contract, and differ only in what a render produces.
