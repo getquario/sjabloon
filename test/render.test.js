@@ -337,44 +337,96 @@ test("{ bound } keeps host names out of names without unbinding them", () => {
 
 test("reads locate every root read in template coordinates", () => {
   assert.deepStrictEqual(template("{{ a }} and {{ b.c }}").reads, [
-    { name: "a", start: 3, end: 4 },
-    { name: "b", start: 15, end: 16 },
+    { name: "a", start: 3, end: 4, path: [] },
+    { name: "b", start: 15, end: 16, path: ["c"] },
   ]);
   assert.deepStrictEqual(
     template("{{ a + a }}").reads,
     [
-      { name: "a", start: 3, end: 4 },
-      { name: "a", start: 7, end: 8 },
+      { name: "a", start: 3, end: 4, path: [] },
+      { name: "a", start: 7, end: 8, path: [] },
     ],
     "every occurrence, in source order — names is the deduplicated view",
   );
   assert.deepStrictEqual(
     template("{{ $.a }}{{#each xs as x}}{{ x.b }}{{/each}}").reads,
     [
-      { name: "$", start: 3, end: 4 },
-      { name: "xs", start: 17, end: 19 },
-      { name: "x", start: 29, end: 30 },
+      { name: "$", start: 3, end: 4, path: ["a"] },
+      { name: "xs", start: 17, end: 19, path: [] },
+      { name: "x", start: 29, end: 30, path: ["b"], each: { name: "xs", path: [] } },
     ],
     "anchors and loop variables are reads too — names omits them, reads points at them",
   );
   assert.deepStrictEqual(
     template("{{#if n }}x{{/if}}").reads,
-    [{ name: "n", start: 6, end: 7 }],
+    [{ name: "n", start: 6, end: 7, path: [] }],
     "a block expression's reads land at its body offset",
   );
   assert.deepStrictEqual(
     template("{{  a }}").reads,
-    [{ name: "a", start: 4, end: 5 }],
+    [{ name: "a", start: 4, end: 5, path: [] }],
     "leading tag whitespace stays counted",
   );
   const tpl = template("{{ run.total }}", undefined, { bound: ["run"] });
   assert.deepStrictEqual(tpl.names, [], "bound leaves names");
   assert.deepStrictEqual(
     tpl.reads,
-    [{ name: "run", start: 3, end: 6 }],
+    [{ name: "run", start: 3, end: 6, path: ["total"] }],
     "a bound read is still a read",
   );
   assert.deepStrictEqual(template("static only").reads, []);
+});
+
+test("a read an #each binds names the collection it iterates", () => {
+  const each = (src) =>
+    template(src).reads.map(({ name, path, dynamic, each }) => ({ name, path, dynamic, each }));
+  assert.deepStrictEqual(
+    each("{{#each @.lines as l}}{{ l.qty }}{{ @.price }}{{/each}}").slice(1),
+    [
+      { name: "l", path: ["qty"], dynamic: undefined, each: { name: "@", path: ["lines"] } },
+      { name: "@", path: ["price"], dynamic: undefined, each: { name: "@", path: ["lines"] } },
+    ],
+    "the loop variable and `@` are the item, so both carry the collection",
+  );
+  assert.deepStrictEqual(
+    each("{{#each $.orders as o}}{{#each o.lines as l}}{{ l.qty }}{{/each}}{{/each}}")[2].each,
+    { name: "$", path: ["orders"] },
+    "a nested collection under an item resolves to the outer collection",
+  );
+  assert.deepStrictEqual(
+    each("{{#each xs as x, i}}{{ i }}{{ loop.index }}{{ y }}{{/each}}")
+      .slice(1)
+      .map((read) => "each" in read && read.each !== undefined),
+    [false, false, false],
+    "the index, `loop` and outer names are not the item",
+  );
+  assert.deepStrictEqual(
+    each("{{#each a as x}}{{#each b as y, x}}{{ x }}{{/each}}{{/each}}")[2].each,
+    undefined,
+    "an inner index shadows an outer loop variable",
+  );
+  assert.deepStrictEqual(
+    each("{{#each a ?? b as x}}{{ x.v }}{{/each}}")[2].each,
+    null,
+    "a collection that is not one plain read has no static origin",
+  );
+  assert.deepStrictEqual(
+    template("{{#each f(a) as x}}{{ x.v }}{{/each}}", { f: (v) => v }).reads[1].each,
+    null,
+    "a computed collection has no static origin",
+  );
+  assert.deepStrictEqual(
+    each("{{ @.v }}")[0].each,
+    undefined,
+    "`@` outside a loop is the embedder's anchor",
+  );
+  assert.deepStrictEqual(
+    each("{{#each xs as x}}{{/each}}{{ x.v }}{{ @.v }}")
+      .slice(1)
+      .map((read) => read.each),
+    [undefined, undefined],
+    "a closed block binds nothing after it",
+  );
 });
 
 test("scoped renders over a scope that already carries the anchors", () => {

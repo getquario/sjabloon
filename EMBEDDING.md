@@ -126,8 +126,30 @@ is the free, deduplicated view.
 
 ```js
 template("{{ title }}: {{ total }}").reads;
-// => [{ name: 'title', start: 3, end: 8 }, { name: 'total', start: 16, end: 21 }]
+// => [
+//   { name: 'title', start: 3, end: 8, path: [] },
+//   { name: 'total', start: 16, end: 21, path: [] },
+// ]
 ```
+
+Each read also carries xprsn's `path` and `dynamic`: the literal member names
+after the root, and whether the expression reads further under them through a
+step the path cannot name. See xprsn's
+[`reads`](https://github.com/getquario/xprsn/blob/main/EMBEDDING.md#reads).
+
+Inside an `#each` block, `@` and the loop variable hold the current item. A read
+of either carries `each`, the root and static path of the collection the block
+iterates. The item sits under an index the template does not name, so a host
+checks it against the collection's elements:
+
+```js
+template("{{#each order.lines as l}}{{ l.qty }}{{/each}}").reads[1];
+// => { name: 'l', start: 29, end: 30, path: ['qty'], each: { name: 'order', path: ['lines'] } }
+```
+
+When the collection is a nested item, `each` names the outer collection. When
+the collection is not one plain read, such as a function call or `a ?? b`, `each`
+is `null`. The index variable, `loop` and every other read carry no `each`.
 
 Spans are offsets into the original template, not into the expression inside the
 tag, so an editor can squiggle, hover, and jump straight from them. An unknown

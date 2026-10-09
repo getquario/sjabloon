@@ -41,9 +41,14 @@ export type SjabloonValues = Record<string, any>;
 
 /**
  * One root-name read, with its span in the template source — xprsn's read
- * record, forwarded with only its coordinates shifted.
+ * record, forwarded with its coordinates shifted. A read of an `#each` item
+ * (`@` or the loop variable inside the block) also carries `each`: the root
+ * and static path of the collection the block iterates. `each` is `null` when
+ * that collection is not one plain read, and absent on every other read.
  */
-export type SjabloonRead = XprsnRead;
+export type SjabloonRead = XprsnRead & {
+  each?: { name: string; path: string[] } | null;
+};
 
 export type SjabloonFunctions = Record<string, Function>;
 
