@@ -1,6 +1,8 @@
 .fuzz-corpus/
 coverage/
 node_modules/
+reports/
+.stryker-tmp/
 
 # libFuzzer artifacts — written under fuzz/ via -artifact_prefix=fuzz/
 fuzz/crash-*
