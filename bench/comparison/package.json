@@ -9,6 +9,6 @@
     "handlebars": "^4.7.10",
     "mustache": "^4.2.0",
     "sjabloon": "file:../..",
-    "tempura": "^0.4.1"
+    "tempura": "^1.0.0"
   }
 }
