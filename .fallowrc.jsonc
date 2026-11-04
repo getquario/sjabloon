@@ -9,6 +9,12 @@
   // Stryker resolves `testRunner: "tap"` to this package by naming convention at
   // run time, so no import or script path names it.
   "ignoreDependencies": ["@stryker-mutator/tap-runner"],
+  // `types.d.ts` is the hand-written declaration of what `core.js` exports, so
+  // the two name the same functions by design.
+  "ignoreExports": [
+    { "file": "lib/core.js", "exports": ["isDiagnostic", "relocate"] },
+    { "file": "lib/types.d.ts", "exports": ["isDiagnostic", "relocate"] },
+  ],
   "health": {
     "ignore": ["bench/**", "fuzz/**"],
   },
